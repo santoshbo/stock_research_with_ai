@@ -1,0 +1,151 @@
+{
+  "ticker": "AAPL",
+  "timestamp": "2026-06-23T18:34:17.011099",
+  "metrics": {
+    "ticker": "AAPL",
+    "company_name": "Apple Inc.",
+    "current_price": 297.01,
+    "currency": "USD",
+    "market_cap": 4362291642368.0,
+    "pe_ratio": 35.957626,
+    "dividend_yield": 0.36,
+    "week_52_high": 317.4,
+    "week_52_low": 199.26,
+    "sector": "Technology"
+  },
+  "financial_history": [
+    {
+      "year": 2025,
+      "sales_revenue": 416161000000.0,
+      "expenses": 283111000000.0,
+      "operating_profit": 133050000000.0,
+      "opm": 31.970799762591884,
+      "net_profit": 112010000000.0,
+      "profit_before_tax": 112010000000.0,
+      "yoy_revenue_growth": null
+    },
+    {
+      "year": 2024,
+      "sales_revenue": 391035000000.0,
+      "expenses": 267819000000.0,
+      "operating_profit": 123216000000.0,
+      "opm": 31.510222870075566,
+      "net_profit": 93736000000.0,
+      "profit_before_tax": 93736000000.0,
+      "yoy_revenue_growth": -6.0375671915436575
+    },
+    {
+      "year": 2023,
+      "sales_revenue": 383285000000.0,
+      "expenses": 268984000000.0,
+      "operating_profit": 114301000000.0,
+      "opm": 29.821412265024723,
+      "net_profit": 96995000000.0,
+      "profit_before_tax": 96995000000.0,
+      "yoy_revenue_growth": -1.9819197770020587
+    }
+  ],
+  "growth_trend": {
+    "revenue_trend": "decelerating",
+    "profitability_trend": "declining",
+    "opm_trend": "contracting",
+    "summary": "Revenue: decelerating. Profitability: declining. OPM: contracting."
+  },
+  "recent_announcements": [],
+  "recommendation": {
+    "signal": "HOLD",
+    "confidence": 0.6075,
+    "reasoning": "Based on profitability (90), growth (40), momentum (60), and valuation (35) analysis.",
+    "key_drivers": [
+      "Profitability: 90",
+      "Growth: 40",
+      "Momentum: 60"
+    ]
+  },
+  "expected_returns": {
+    "bull": 66.41,
+    "base": 15.76,
+    "bear": -24.5
+  },
+  "swing_trade": {
+    "opportunity_exists": true,
+    "confidence_score": 95.0,
+    "entry_zone_low": 290.55,
+    "entry_zone_high": 302.95,
+    "stop_loss_price": 276.02,
+    "stop_loss_percent": 5.0,
+    "target_low": 320.77,
+    "target_high": 332.65,
+    "target_return_percent": 12.0,
+    "invalidation_price": 330.96,
+    "timeframe_days": 45,
+    "commentary": "\u2705 QUALIFIED FOR SWING TRADE! Confidence: 95% | Return: 12.0% | Entry 290.55-302.95, Stop 276.02, Target 332.65. Timeframe: 1-2 months. Invalidation above 330.96."
+  },
+  "long_term": {
+    "target_price_low": 224.23,
+    "target_price_high": 494.25,
+    "target_return_percent": 15.76,
+    "bull_case_return": 66.41,
+    "bear_case_return": -24.5,
+    "base_case_return": 15.76,
+    "holding_period_years": 3,
+    "commentary": "Base case: 16% return over 3 years (target 343.83). Bull: 66% (494.25). Bear: -25% (224.23). Assumes continued business execution and market conditions."
+  },
+  "risk_analysis": {
+    "overall_risk_level": "LOW",
+    "volatility_risk": "LOW",
+    "business_risk": "LOW",
+    "market_risk": "LOW",
+    "scenarios": [
+      {
+        "scenario_name": "Bull",
+        "probability": 0.25,
+        "description": "Strong business execution, market tailwinds, above-market earnings growth",
+        "key_triggers": [
+          "Earnings beat expectations",
+          "Market expansion",
+          "Margin expansion"
+        ],
+        "expected_return": 37.500000000000014
+      },
+      {
+        "scenario_name": "Base",
+        "probability": 0.5,
+        "description": "As-expected business performance, aligned with market consensus",
+        "key_triggers": [
+          "In-line earnings",
+          "Stable competitive position",
+          "Normal valuations"
+        ],
+        "expected_return": 10.000000000000007
+      },
+      {
+        "scenario_name": "Bear",
+        "probability": 0.25,
+        "description": "Business headwinds, competitive pressures, or macro downturn",
+        "key_triggers": [
+          "Earnings miss",
+          "Market share loss",
+          "Economic slowdown"
+        ],
+        "expected_return": -11.99999999999999
+      }
+    ],
+    "downside_triggers": [
+      "Earnings miss vs. expectations",
+      "Market share loss to competitors",
+      "Continued revenue decline"
+    ],
+    "uncertainty_notes": [
+      "No recent announcements found"
+    ],
+    "summary": "Overall risk: LOW. Business fundamentals stable. Market conditions should be monitored."
+  },
+  "data_sources": [
+    "yahoo_finance"
+  ],
+  "analysis_quality": "partial",
+  "missing_data_notes": [
+    "No recent announcements found"
+  ]
+}

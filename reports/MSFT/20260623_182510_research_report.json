@@ -1,0 +1,150 @@
+{
+  "ticker": "MSFT",
+  "timestamp": "2026-06-23T18:25:10.157280",
+  "metrics": {
+    "ticker": "MSFT",
+    "company_name": "Microsoft Corporation",
+    "current_price": 367.34,
+    "currency": "USD",
+    "market_cap": 2728761229312.0,
+    "pe_ratio": 21.878498,
+    "dividend_yield": 0.99,
+    "week_52_high": 555.45,
+    "week_52_low": 356.28,
+    "sector": "Technology"
+  },
+  "financial_history": [
+    {
+      "year": 2025,
+      "sales_revenue": 281724000000.0,
+      "expenses": 153196000000.0,
+      "operating_profit": 128528000000.0,
+      "opm": 45.62195624085985,
+      "net_profit": 101832000000.0,
+      "profit_before_tax": 101832000000.0,
+      "yoy_revenue_growth": null
+    },
+    {
+      "year": 2024,
+      "sales_revenue": 245122000000.0,
+      "expenses": 135689000000.0,
+      "operating_profit": 109433000000.0,
+      "opm": 44.64429957327371,
+      "net_profit": 88136000000.0,
+      "profit_before_tax": 88136000000.0,
+      "yoy_revenue_growth": -12.992148343769077
+    },
+    {
+      "year": 2023,
+      "sales_revenue": 211915000000.0,
+      "expenses": 123392000000.0,
+      "operating_profit": 88523000000.0,
+      "opm": 41.7728806361041,
+      "net_profit": 72361000000.0,
+      "profit_before_tax": 72361000000.0,
+      "yoy_revenue_growth": -13.547131632411617
+    }
+  ],
+  "growth_trend": {
+    "revenue_trend": "volatile",
+    "profitability_trend": "volatile",
+    "opm_trend": "volatile",
+    "summary": "Error analyzing trends: 1 validation error for GrowthTrend\nrevenue_trend\n  Input should be 'accelerating', 'stable', 'decelerating', 'volatile' or 'insufficient_data' [type=literal_error, input_value='declining', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error"
+  },
+  "recent_announcements": [],
+  "recommendation": {
+    "signal": "HOLD",
+    "confidence": 0.52,
+    "reasoning": "Based on profitability (90), growth (20), momentum (35), and valuation (50) analysis.",
+    "key_drivers": [
+      "Profitability: 90",
+      "Valuation: 50",
+      "Momentum: 35"
+    ]
+  },
+  "expected_returns": {
+    "bull": 59.17,
+    "base": 15.76,
+    "bear": -21.07
+  },
+  "swing_trade": {
+    "opportunity_exists": false,
+    "entry_zone_low": null,
+    "entry_zone_high": null,
+    "stop_loss_price": null,
+    "stop_loss_percent": null,
+    "target_low": null,
+    "target_high": null,
+    "target_return_percent": null,
+    "invalidation_price": null,
+    "timeframe_days": null,
+    "commentary": "Momentum or volatility conditions not favorable for swing trading at this time."
+  },
+  "long_term": {
+    "target_price_low": 289.94,
+    "target_price_high": 584.71,
+    "target_return_percent": 15.76,
+    "bull_case_return": 59.17,
+    "bear_case_return": -21.07,
+    "base_case_return": 15.76,
+    "holding_period_years": 3,
+    "commentary": "Base case: 16% return over 3 years (target 425.24). Bull: 59% (584.71). Bear: -21% (289.94). Assumes continued business execution and market conditions."
+  },
+  "risk_analysis": {
+    "overall_risk_level": "MEDIUM",
+    "volatility_risk": "LOW",
+    "business_risk": "MEDIUM",
+    "market_risk": "LOW",
+    "scenarios": [
+      {
+        "scenario_name": "Bull",
+        "probability": 0.25,
+        "description": "Strong business execution, market tailwinds, above-market earnings growth",
+        "key_triggers": [
+          "Earnings beat expectations",
+          "Market expansion",
+          "Margin expansion"
+        ],
+        "expected_return": 31.25
+      },
+      {
+        "scenario_name": "Base",
+        "probability": 0.5,
+        "description": "As-expected business performance, aligned with market consensus",
+        "key_triggers": [
+          "In-line earnings",
+          "Stable competitive position",
+          "Normal valuations"
+        ],
+        "expected_return": 5.000000000000005
+      },
+      {
+        "scenario_name": "Bear",
+        "probability": 0.25,
+        "description": "Business headwinds, competitive pressures, or macro downturn",
+        "key_triggers": [
+          "Earnings miss",
+          "Market share loss",
+          "Economic slowdown"
+        ],
+        "expected_return": -15.99999999999999
+      }
+    ],
+    "downside_triggers": [
+      "Earnings miss vs. expectations",
+      "Market share loss to competitors",
+      "Continued revenue decline"
+    ],
+    "uncertainty_notes": [
+      "No recent announcements found"
+    ],
+    "summary": "Overall risk: MEDIUM. Business fundamentals stable. Market conditions should be monitored."
+  },
+  "data_sources": [
+    "yahoo_finance"
+  ],
+  "analysis_quality": "partial",
+  "missing_data_notes": [
+    "No recent announcements found"
+  ]
+}

@@ -1,0 +1,150 @@
+{
+  "ticker": "RELIANCE.NS",
+  "timestamp": "2026-06-23T18:33:00.176943",
+  "metrics": {
+    "ticker": "RELIANCE.NS",
+    "company_name": "Reliance Industries Limited",
+    "current_price": 1309.5,
+    "currency": "INR",
+    "market_cap": 17720772919296.0,
+    "pe_ratio": 21.938349,
+    "dividend_yield": 0.45,
+    "week_52_high": 1611.8,
+    "week_52_low": 1253.2,
+    "sector": "Energy"
+  },
+  "financial_history": [
+    {
+      "year": 2026,
+      "sales_revenue": 10572190000000.0,
+      "expenses": 9358420000000.0,
+      "operating_profit": 1213770000000.0,
+      "opm": 11.480781181571652,
+      "net_profit": 807750000000.0,
+      "profit_before_tax": 807750000000.0,
+      "yoy_revenue_growth": null
+    },
+    {
+      "year": 2025,
+      "sales_revenue": 9646930000000.0,
+      "expenses": 8522310000000.0,
+      "operating_profit": 1124620000000.0,
+      "opm": 11.65780201577082,
+      "net_profit": 696480000000.0,
+      "profit_before_tax": 696480000000.0,
+      "yoy_revenue_growth": -8.75182909122897
+    },
+    {
+      "year": 2024,
+      "sales_revenue": 9010640000000.0,
+      "expenses": 7893980000000.0,
+      "operating_profit": 1116660000000.0,
+      "opm": 12.392682428773096,
+      "net_profit": 696210000000.0,
+      "profit_before_tax": 696210000000.0,
+      "yoy_revenue_growth": -6.5957771021454485
+    }
+  ],
+  "growth_trend": {
+    "revenue_trend": "decelerating",
+    "profitability_trend": "declining",
+    "opm_trend": "expanding",
+    "summary": "Revenue: decelerating. Profitability: declining. OPM: expanding."
+  },
+  "recent_announcements": [],
+  "recommendation": {
+    "signal": "HOLD",
+    "confidence": 0.505,
+    "reasoning": "Based on profitability (60), growth (40), momentum (50), and valuation (50) analysis.",
+    "key_drivers": [
+      "Profitability: 60",
+      "Growth: 40",
+      "Momentum: 50"
+    ]
+  },
+  "expected_returns": {
+    "bull": 66.41,
+    "base": 15.76,
+    "bear": -24.5
+  },
+  "swing_trade": {
+    "opportunity_exists": false,
+    "entry_zone_low": null,
+    "entry_zone_high": null,
+    "stop_loss_price": null,
+    "stop_loss_percent": null,
+    "target_low": null,
+    "target_high": null,
+    "target_return_percent": null,
+    "invalidation_price": null,
+    "timeframe_days": null,
+    "commentary": "Momentum or volatility conditions not favorable for swing trading at this time."
+  },
+  "long_term": {
+    "target_price_low": 988.64,
+    "target_price_high": 2179.12,
+    "target_return_percent": 15.76,
+    "bull_case_return": 66.41,
+    "bear_case_return": -24.5,
+    "base_case_return": 15.76,
+    "holding_period_years": 3,
+    "commentary": "Base case: 16% return over 3 years (target 1515.91). Bull: 66% (2179.12). Bear: -25% (988.64). Assumes continued business execution and market conditions."
+  },
+  "risk_analysis": {
+    "overall_risk_level": "LOW",
+    "volatility_risk": "LOW",
+    "business_risk": "LOW",
+    "market_risk": "LOW",
+    "scenarios": [
+      {
+        "scenario_name": "Bull",
+        "probability": 0.25,
+        "description": "Strong business execution, market tailwinds, above-market earnings growth",
+        "key_triggers": [
+          "Earnings beat expectations",
+          "Market expansion",
+          "Margin expansion"
+        ],
+        "expected_return": 31.250000000000018
+      },
+      {
+        "scenario_name": "Base",
+        "probability": 0.5,
+        "description": "As-expected business performance, aligned with market consensus",
+        "key_triggers": [
+          "In-line earnings",
+          "Stable competitive position",
+          "Normal valuations"
+        ],
+        "expected_return": 5.000000000000011
+      },
+      {
+        "scenario_name": "Bear",
+        "probability": 0.25,
+        "description": "Business headwinds, competitive pressures, or macro downturn",
+        "key_triggers": [
+          "Earnings miss",
+          "Market share loss",
+          "Economic slowdown"
+        ],
+        "expected_return": -15.99999999999998
+      }
+    ],
+    "downside_triggers": [
+      "Earnings miss vs. expectations",
+      "Market share loss to competitors",
+      "Continued revenue decline"
+    ],
+    "uncertainty_notes": [
+      "No recent announcements found"
+    ],
+    "summary": "Overall risk: LOW. Business fundamentals stable. Market conditions should be monitored."
+  },
+  "data_sources": [
+    "yahoo_finance"
+  ],
+  "analysis_quality": "partial",
+  "missing_data_notes": [
+    "No recent announcements found"
+  ]
+}

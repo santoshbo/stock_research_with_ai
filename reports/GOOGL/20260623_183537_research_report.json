@@ -1,0 +1,151 @@
+{
+  "ticker": "GOOGL",
+  "timestamp": "2026-06-23T18:35:37.829693",
+  "metrics": {
+    "ticker": "GOOGL",
+    "company_name": "Alphabet Inc.",
+    "current_price": 349.68,
+    "currency": "USD",
+    "market_cap": 4266995482624.0,
+    "pe_ratio": 26.67277,
+    "dividend_yield": 0.25,
+    "week_52_high": 408.61,
+    "week_52_low": 166.13,
+    "sector": "Communication Services"
+  },
+  "financial_history": [
+    {
+      "year": 2025,
+      "sales_revenue": 402836000000.0,
+      "expenses": 273797000000.0,
+      "operating_profit": 129039000000.0,
+      "opm": 32.032638592380025,
+      "net_profit": 132170000000.0,
+      "profit_before_tax": 132170000000.0,
+      "yoy_revenue_growth": null
+    },
+    {
+      "year": 2024,
+      "sales_revenue": 350018000000.0,
+      "expenses": 237628000000.0,
+      "operating_profit": 112390000000.0,
+      "opm": 32.1097772114577,
+      "net_profit": 100118000000.0,
+      "profit_before_tax": 100118000000.0,
+      "yoy_revenue_growth": -13.111539187163016
+    },
+    {
+      "year": 2023,
+      "sales_revenue": 307394000000.0,
+      "expenses": 223101000000.0,
+      "operating_profit": 84293000000.0,
+      "opm": 27.421810445226647,
+      "net_profit": 73795000000.0,
+      "profit_before_tax": 73795000000.0,
+      "yoy_revenue_growth": -12.177659434657647
+    }
+  ],
+  "growth_trend": {
+    "revenue_trend": "volatile",
+    "profitability_trend": "volatile",
+    "opm_trend": "volatile",
+    "summary": "Error analyzing trends: 1 validation error for GrowthTrend\nrevenue_trend\n  Input should be 'accelerating', 'stable', 'decelerating', 'volatile' or 'insufficient_data' [type=literal_error, input_value='declining', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error"
+  },
+  "recent_announcements": [],
+  "recommendation": {
+    "signal": "HOLD",
+    "confidence": 0.5275,
+    "reasoning": "Based on profitability (90), growth (20), momentum (50), and valuation (35) analysis.",
+    "key_drivers": [
+      "Profitability: 90",
+      "Momentum: 50",
+      "Growth: 20"
+    ]
+  },
+  "expected_returns": {
+    "bull": 59.17,
+    "base": 15.76,
+    "bear": -21.07
+  },
+  "swing_trade": {
+    "opportunity_exists": false,
+    "confidence_score": 0.0,
+    "entry_zone_low": null,
+    "entry_zone_high": null,
+    "stop_loss_price": null,
+    "stop_loss_percent": null,
+    "target_low": null,
+    "target_high": null,
+    "target_return_percent": null,
+    "invalidation_price": null,
+    "timeframe_days": null,
+    "commentary": "Momentum or volatility conditions not favorable for swing trading at this time."
+  },
+  "long_term": {
+    "target_price_low": 276.0,
+    "target_price_high": 556.6,
+    "target_return_percent": 15.76,
+    "bull_case_return": 59.17,
+    "bear_case_return": -21.07,
+    "base_case_return": 15.76,
+    "holding_period_years": 3,
+    "commentary": "Base case: 16% return over 3 years (target 404.80). Bull: 59% (556.60). Bear: -21% (276.00). Assumes continued business execution and market conditions."
+  },
+  "risk_analysis": {
+    "overall_risk_level": "MEDIUM",
+    "volatility_risk": "LOW",
+    "business_risk": "MEDIUM",
+    "market_risk": "LOW",
+    "scenarios": [
+      {
+        "scenario_name": "Bull",
+        "probability": 0.25,
+        "description": "Strong business execution, market tailwinds, above-market earnings growth",
+        "key_triggers": [
+          "Earnings beat expectations",
+          "Market expansion",
+          "Margin expansion"
+        ],
+        "expected_return": 31.25000000000001
+      },
+      {
+        "scenario_name": "Base",
+        "probability": 0.5,
+        "description": "As-expected business performance, aligned with market consensus",
+        "key_triggers": [
+          "In-line earnings",
+          "Stable competitive position",
+          "Normal valuations"
+        ],
+        "expected_return": 5.000000000000011
+      },
+      {
+        "scenario_name": "Bear",
+        "probability": 0.25,
+        "description": "Business headwinds, competitive pressures, or macro downturn",
+        "key_triggers": [
+          "Earnings miss",
+          "Market share loss",
+          "Economic slowdown"
+        ],
+        "expected_return": -15.999999999999984
+      }
+    ],
+    "downside_triggers": [
+      "Earnings miss vs. expectations",
+      "Market share loss to competitors",
+      "Continued revenue decline"
+    ],
+    "uncertainty_notes": [
+      "No recent announcements found"
+    ],
+    "summary": "Overall risk: MEDIUM. Business fundamentals stable. Market conditions should be monitored."
+  },
+  "data_sources": [
+    "yahoo_finance"
+  ],
+  "analysis_quality": "partial",
+  "missing_data_notes": [
+    "No recent announcements found"
+  ]
+}
