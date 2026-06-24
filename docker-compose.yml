@@ -1,0 +1,47 @@
+services:
+  stock-research:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: stock-research:latest
+    container_name: stock-research
+    restart: unless-stopped
+
+    ports:
+      - "8501:8501"
+
+    # Load API keys and settings from your local .env file.
+    # Copy .env.example → .env and fill in GROQ_API_KEY before starting.
+    env_file:
+      - .env
+
+    environment:
+      # Override REPORTS_DIR so reports land inside the named volume below.
+      REPORTS_DIR: /home/app/project/reports
+      # Optional tuning – override in .env to change defaults.
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-3600}
+      RESEARCH_TIMEOUT_SECONDS: ${RESEARCH_TIMEOUT_SECONDS:-120}
+      ENABLE_SCREENER_IN: ${ENABLE_SCREENER_IN:-true}
+      PDF_INCLUDE_CHARTS: ${PDF_INCLUDE_CHARTS:-true}
+      MAX_SEARCH_HISTORY: ${MAX_SEARCH_HISTORY:-20}
+
+    volumes:
+      # Persists generated reports (JSON, Markdown, PDF) across container restarts.
+      - reports-data:/home/app/project/reports
+      # Persists SQLite databases (search history, portfolio) and data cache.
+      # PROJECT_ROOT resolves to /home/app inside the container (see Dockerfile note).
+      - cache-data:/home/app/.cache
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+# Named volumes are managed by Docker and persist until explicitly removed.
+# To inspect host path: docker volume inspect stock_research_with_ai_reports-data
+volumes:
+  reports-data:
+  cache-data:

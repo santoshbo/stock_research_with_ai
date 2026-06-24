@@ -40,12 +40,104 @@ Always do your own research and consult a qualified financial advisor before mak
 
 ## Quick Start
 
-### Requirements
+Two ways to run the app: **Docker** (recommended, no Python setup needed) or **local Python**.
+
+---
+
+### Option 1 — Docker (Recommended)
+
+#### Requirements
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
+
+#### 1. Get a Groq API key
+
+Create a free key at https://console.groq.com/keys
+
+#### 2. Create your .env file
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and set at minimum:
+
+```ini
+GROQ_API_KEY=your_groq_key
+```
+
+#### 3. Build the Docker image
+
+```bash
+docker compose build
+```
+
+This downloads the base Python image and installs all dependencies.  
+Takes 3–5 minutes on first run; subsequent builds use the layer cache.
+
+#### 4. Start the app
+
+```bash
+docker compose up
+```
+
+Add `-d` to run in the background:
+
+```bash
+docker compose up -d
+```
+
+#### 5. Open in browser
+
+```
+http://localhost:8501
+```
+
+#### Stop the app
+
+```bash
+docker compose down
+```
+
+Reports and portfolio data survive — they are stored in Docker named volumes:
+
+| Data | Volume |
+|---|---|
+| Reports (JSON / Markdown / PDF) | `stock_research_with_ai_reports-data` |
+| SQLite history and portfolio | `stock_research_with_ai_cache-data` |
+
+#### Rebuild after code changes
+
+```bash
+docker compose up --build
+```
+
+#### Inspect or back up data
+
+```bash
+# See where Docker stores the volume on disk
+docker volume inspect stock_research_with_ai_reports-data
+
+# Copy reports out of the container to your local machine
+docker cp stock-research:/home/app/project/reports ./reports-backup
+```
+
+#### Remove all data (destructive)
+
+```bash
+docker compose down -v
+```
+
+---
+
+### Option 2 — Local Python
+
+#### Requirements
 
 - Python 3.13+
 - uv (recommended) or pip
 
-### Install
+#### Install
 
 ```bash
 cd stock_research_with_ai
@@ -58,15 +150,15 @@ Alternative with pip:
 pip install -e .
 ```
 
-### Configure Environment
+#### Configure Environment
 
-Create or edit .env in the project root and set at minimum:
+Create or edit `.env` in the project root and set at minimum:
 
 ```ini
 GROQ_API_KEY=your_groq_key
 ```
 
-Optional:
+Optional settings:
 
 ```ini
 GOOGLE_API_KEY=your_google_key
@@ -80,7 +172,7 @@ REPORTS_DIR=./reports
 LOG_LEVEL=INFO
 ```
 
-## Run
+#### Run
 
 Start Streamlit directly:
 
@@ -144,11 +236,14 @@ If Screener.in data is unavailable, analysis still proceeds with available sourc
 
 ## Project Structure
 
-- src/app.py: end-to-end research orchestration
-- src/ui/streamlit_app.py: Streamlit UI (research + portfolio panel)
-- src/tools/: data adapters, scoring, trading, charts, company lookup
-- src/storage/: report writer, history store, portfolio store
-- src/models/: analysis and portfolio models
+- `Dockerfile`: multi-stage container build definition
+- `docker-compose.yml`: single-command build and run with persistent volumes
+- `.env.example`: template for all environment variables
+- `src/app.py`: end-to-end research orchestration
+- `src/ui/streamlit_app.py`: Streamlit UI (research + portfolio panel)
+- `src/tools/`: data adapters, scoring, trading, charts, company lookup
+- `src/storage/`: report writer, history store, portfolio store
+- `src/models/`: analysis and portfolio models
 
 ## Development
 
