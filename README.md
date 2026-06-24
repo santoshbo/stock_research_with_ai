@@ -1,187 +1,176 @@
 # stock_research_with_ai
 
-Stock Research Made Easy With AI — Powered by Groq LLM, Yahoo Finance, and Screener.in
+AI-assisted stock research and portfolio tracking application built with Streamlit.
 
-## ⚠️ **Important Disclaimer**
+Data and analysis pipeline uses:
+- Groq LLM for narrative insights and recommendations
+- Yahoo Finance as the primary data source
+- Screener.in as an additional source for Indian stocks
 
-This application is for **educational purposes only** and provides analysis and signals based on publicly available financial data and AI-generated insights. 
+## Important Disclaimer
 
-**NOT financial or investment advice.** Do not use this tool as the sole basis for investment decisions. Always consult with a qualified financial advisor before making investment decisions. Past performance does not guarantee future results. Markets are volatile and involve significant risk of loss.
+This project is for educational and informational use only.
+It is not financial advice, portfolio management advice, or a solicitation to trade.
 
----
+Always do your own research and consult a qualified financial advisor before making investment decisions.
 
-## Features
+## What Is New
 
-- **Multi-ticker Search**: Research US and Indian stocks
-- **3-Year Financial Analysis**: Sales, expenses, operating profit, OPM, net profit, profit before tax
-- **Growth Trend Detection**: Identifies improving or declining performance over time
-- **Recent Announcements**: Aggregates recent corporate news and announcements
-- **Educational Recommendations**: Buy/Hold/Sell signals with confidence scoring (not investment advice)
-- **Risk Analysis**: Success/failure scenarios and downside triggers
-- **Trading Outlook**: Swing trade opportunities (entry zones, stop-loss, targets) and long-term targets
-- **Report Generation**: Auto-saves detailed PDF reports in `/reports` directory
-- **Search History**: Maintains recent 20 searches for quick re-analysis
+- Portfolio management panel with add, sell, and remove actions
+- Persistent portfolio storage in SQLite
+- Realized and unrealized P&L tracking with active/sold tabs
+- Auto ticker resolution for Indian equities (for example, raw ticker to .NS/.BO when needed)
+- Interactive charts for:
+  - financial trends
+  - swing-trade setup
+  - 1-2 year price projection scenarios
+- Multi-format report generation (JSON, Markdown, PDF)
+- Search history persistence in local cache
+- Quality/missing-data notes in generated analysis
 
----
+## Core Features
 
-## Installation
+- Single-click research workflow from company name or ticker
+- Company lookup and suggestions (US + India mappings)
+- 3-year financial summary and growth trend analysis
+- Recommendation signal with confidence and key drivers
+- Risk analysis with downside triggers and scenario framing
+- Swing-trade and long-term outlook modules
+- Report output saved per ticker under the reports directory
 
-### Prerequisites
+## Quick Start
+
+### Requirements
 
 - Python 3.13+
-- `uv` package manager (or `pip`)
+- uv (recommended) or pip
 
-### Setup
-
-1. **Clone/navigate to project**:
-   ```bash
-   cd stock_research_with_ai
-   ```
-
-2. **Install dependencies**:
-   ```bash
-   uv sync
-   # or if using pip:
-   pip install -e .
-   ```
-
-3. **Configure environment**:
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Edit `.env` and add your API keys:
-   - `GROQ_API_KEY`: Get from https://console.groq.com/keys
-   - `GOOGLE_API_KEY`: (optional) Get from Google Cloud Console
-
-4. **Verify installation**:
-   ```bash
-   uv run python -c "import streamlit; print('✓ Streamlit ready')"
-   ```
-
----
-
-## Running the Application
+### Install
 
 ```bash
-# Start the Streamlit UI
-uv run streamlit run src/ui/streamlit_app.py
+cd stock_research_with_ai
+uv sync
+```
 
-# Or directly:
+Alternative with pip:
+
+```bash
+pip install -e .
+```
+
+### Configure Environment
+
+Create or edit .env in the project root and set at minimum:
+
+```ini
+GROQ_API_KEY=your_groq_key
+```
+
+Optional:
+
+```ini
+GOOGLE_API_KEY=your_google_key
+RESEARCH_TIMEOUT_SECONDS=120
+CACHE_TTL_SECONDS=3600
+SCREENER_IN_TIMEOUT=30
+ENABLE_SCREENER_IN=true
+PDF_INCLUDE_CHARTS=true
+MAX_SEARCH_HISTORY=20
+REPORTS_DIR=./reports
+LOG_LEVEL=INFO
+```
+
+## Run
+
+Start Streamlit directly:
+
+```bash
+uv run streamlit run src/ui/streamlit_app.py
+```
+
+Or via launcher:
+
+```bash
 uv run python main.py
 ```
 
-The app will open in your browser at `http://localhost:8501`
+App default URL: http://localhost:8501
 
----
+## Research Workflow
 
-## How It Works
+1. Enter company name or ticker in the sidebar search box.
+2. Pick a suggestion or click Research.
+3. The app aggregates market, financial, and announcement data.
+4. Scoring and risk engines produce recommendation and scenarios.
+5. Trading module calculates swing and long-term outlook.
+6. Reports are saved as JSON, Markdown, and PDF.
+7. You can add the researched stock directly to your portfolio.
 
-1. **Enter a stock ticker** (e.g., `AAPL` for Apple, `RELIANCE.NS` for Reliance India)
-2. **Click "Research"** to start analysis
-3. The app will:
-   - Fetch 3 years of financial data from Yahoo Finance
-   - For Indian stocks, retrieve annual reports and concalls from Screener.in
-   - Aggregate metrics and detect growth trends
-   - Use Groq LLM to analyze and generate insights
-   - Calculate risk scores and trading opportunities
-   - Generate and save a detailed PDF report
-4. **View results** in the dashboard with charts and metrics
-5. **Browse history** in the sidebar to re-open previous research
+## Portfolio Workflow
 
----
+- Add holdings with quantity, buy price, and currency
+- View active holdings with live price enrichment
+- Sell holdings and track realized P&L
+- Remove active holdings
+- View summarized invested value, unrealized P&L, and realized P&L
+
+Portfolio data is stored locally in .cache/portfolio.db.
+
+## Reports And Storage
+
+- Reports are stored under reports/TICKER/
+- Each run creates timestamped files:
+  - YYYYMMDD_HHMMSS_research_report.json
+  - YYYYMMDD_HHMMSS_research_report.md
+  - YYYYMMDD_HHMMSS_research_report.pdf
+- Search history is stored in .cache/search_history.json
 
 ## Data Sources
 
-### Yahoo Finance (All Stocks)
-- Historical stock prices (1–10 years)
-- Key financial metrics: PE ratio, dividend yield, market cap, 52-week high/low
-- Annual financial statements: revenue, expenses, net income (when available)
-- Analyst ratings and earnings estimates
+### Yahoo Finance
 
-### Screener.in (Indian Stocks Only)
-- Annual reports and financial statements
-- Concall transcripts and notes
-- Recent announcements and corporate actions
-- Best-effort data (gracefully degrades if unavailable or blocked)
+- Price history
+- Core metrics (price, market cap, PE, 52-week range)
+- Financial statements (when available)
+- Analyst recommendation data and earnings dates (when available)
 
----
+### Screener.in (Indian stocks)
 
-## Report Structure
+- Announcements
+- Annual report links
+- Concall transcript links
 
-Generated PDF reports include:
+If Screener.in data is unavailable, analysis still proceeds with available sources.
 
-- **Company Overview**: Name, sector, market cap, current price
-- **3-Year Financial Summary**: Table with sales, expenses, operating profit, OPM, net profit, PBT
-- **Growth Analysis**: Trend commentary and year-over-year changes
-- **Recent Announcements**: Recent corporate news and actions
-- **Educational Recommendation**: Buy/Hold/Sell signal with confidence and disclaimer
-- **Expected Returns**: Scenario-based return projections (not guaranteed)
-- **Trading Outlook**:
-  - **Swing Trading**: Entry zone, stop-loss %, target band, invalidation conditions
-  - **Long-Term**: Multi-year target price and scenario targets
-- **Risk Analysis**: Success/failure probabilities, downside triggers, and key uncertainties
+## Project Structure
 
----
-
-## Configuration
-
-Edit `.env` to customize behavior:
-
-```ini
-# LLM Model (Groq API)
-GROQ_API_KEY=your_key
-
-# Timeout for research (seconds)
-RESEARCH_TIMEOUT_SECONDS=120
-
-# Max historical searches to display
-MAX_SEARCH_HISTORY=20
-
-# Enable/disable Screener.in scraping for Indian stocks
-ENABLE_SCREENER_IN=true
-
-# Reports output directory
-REPORTS_DIR=./reports
-```
-
----
-
-## Limitations
-
-- **Data Availability**: Not all stocks have complete historical data; missing data is noted in reports
-- **Screener.in Access**: May be rate-limited or occasionally unavailable; app gracefully falls back
-- **Real-time Prices**: Uses delayed/EOD data (not real-time trading)
-- **Sentiment Analysis**: Based on available news; may not capture all market sentiment
-- **Recommendations**: Educational signals only; not substitutes for professional financial advice
-- **Single-User**: Currently designed for personal use; no multi-user or portfolio tracking
-
----
+- src/app.py: end-to-end research orchestration
+- src/ui/streamlit_app.py: Streamlit UI (research + portfolio panel)
+- src/tools/: data adapters, scoring, trading, charts, company lookup
+- src/storage/: report writer, history store, portfolio store
+- src/models/: analysis and portfolio models
 
 ## Development
 
-### Running Tests
+Run the e2e test script:
 
 ```bash
-uv run pytest tests/ -v
+uv run python test_e2e.py
 ```
 
-### Adding New Features
+Run the demo flow:
 
-The codebase is modular:
-- `src/tools/` — Data adapters (Yahoo Finance, Screener.in)
-- `src/llm/` — Groq client and prompt templates
-- `src/ui/` — Streamlit app components
-- `src/storage/` — Report and history persistence
+```bash
+uv run python demo_research.py
+```
 
----
+## Known Limitations
+
+- Data completeness varies by ticker and exchange
+- Price feeds are best-effort and may be delayed
+- Recommendation outputs are model-assisted and non-deterministic
+- Designed for local/single-user usage
 
 ## License
 
 MIT
-
----
-
-## Support
-
-For issues or questions, check the `/reports` directory for generated research outputs and error logs in the application console.
