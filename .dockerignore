@@ -1,0 +1,45 @@
+# --- Secrets & local config ---
+.env
+*.env
+
+# --- Runtime data (mounted as volumes in production) ---
+reports/
+.cache/
+
+# --- Python build artifacts ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# --- Virtual environments ---
+venv/
+.venv/
+env/
+.env.bak
+
+# --- Version control ---
+.git/
+.gitignore
+.gitattributes
+
+# --- IDE & OS metadata ---
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# --- Test & CI ---
+test_e2e.py
+.pytest_cache/
+htmlcov/
+.coverage
+*.log
+
+# --- Documentation ---
+README.md
