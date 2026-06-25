@@ -1,6 +1,9 @@
 """Streamlit UI for stock research application."""
 
+from datetime import datetime
+
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 
 from src.app import StockResearchAgent
@@ -150,6 +153,18 @@ if "sell_form_open" not in st.session_state:
 if "portfolio_tab" not in st.session_state:
     st.session_state.portfolio_tab = "active"  # "active" or "sold"
 
+if "portfolio_snapshot" not in st.session_state:
+    st.session_state.portfolio_snapshot = None
+
+if "auto_refresh_minutes" not in st.session_state:
+    st.session_state.auto_refresh_minutes = 15
+
+if "show_read_target_alerts" not in st.session_state:
+    st.session_state.show_read_target_alerts = False
+
+
+AUTO_REFRESH_DEFAULT_MINUTES = 15
+
 
 PORTFOLIO_TYPE_LABELS = {
     "SWING_TRADE": "Swing Trade",
@@ -164,6 +179,107 @@ BROKER_ACCOUNT_LABELS = {
     "UPSTOX": "Upstox",
 }
 BROKER_ACCOUNT_BY_LABEL = {v: k for k, v in BROKER_ACCOUNT_LABELS.items()}
+
+
+def enable_auto_refresh(interval_ms: int) -> None:
+    """Trigger a full-page refresh at a fixed interval."""
+    components.html(
+        f"""
+        <script>
+            setTimeout(function() {{
+                window.parent.location.reload();
+            }}, {int(interval_ms)});
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+
+
+def build_portfolio_snapshot():
+    """Load holdings, apply defaults, and enrich active positions with live prices."""
+    store: PortfolioStore = st.session_state.portfolio_store
+
+    all_holdings = store.get_all_holdings()
+    for h in all_holdings:
+        if not h.portfolio_type:
+            h.portfolio_type = "MIDTERM"
+        if not h.broker_account:
+            h.broker_account = "ZERODHA"
+
+    active_holdings = [h for h in all_holdings if not h.is_sold]
+    sold_holdings = [h for h in all_holdings if h.is_sold]
+
+    if active_holdings:
+        active_holdings = store.enrich_with_prices(active_holdings)
+
+    snapshot = {
+        "all_holdings": active_holdings + sold_holdings,
+        "active_holdings": active_holdings,
+        "sold_holdings": sold_holdings,
+        "refreshed_at": datetime.now(),
+    }
+    st.session_state.portfolio_snapshot = snapshot
+    return snapshot
+
+
+def _build_target_alert_message(holding, target_level: int) -> str:
+    target_price = holding.target_1_price if target_level == 1 else holding.target_2_price
+    label = "1st" if target_level == 1 else "2nd"
+    msg = f"{holding.ticker}: {label} target hit"
+    if target_price is not None:
+        msg += f" ({target_price:.2f})"
+    if holding.current_price is not None:
+        msg += f" | Current: {holding.current_price:.2f}"
+    return msg
+
+
+def render_target_hit_notifications(active_holdings, show_read: bool = False):
+    """Show unread target-hit notifications, with optional read history."""
+    unread_events = []
+    read_events = []
+
+    for holding in active_holdings:
+        if holding.target_1_achieved and holding.partial_sold_quantity <= 0:
+            evt = (
+                holding.target_1_achieved_at or datetime.min,
+                _build_target_alert_message(holding, 1),
+                bool(holding.target_1_notified),
+            )
+            if evt[2]:
+                read_events.append(evt)
+            else:
+                unread_events.append(evt)
+
+        if holding.target_2_achieved:
+            evt = (
+                holding.target_2_achieved_at or datetime.min,
+                _build_target_alert_message(holding, 2),
+                bool(holding.target_2_notified),
+            )
+            if evt[2]:
+                read_events.append(evt)
+            else:
+                unread_events.append(evt)
+
+    unread_events.sort(key=lambda x: x[0], reverse=True)
+    read_events.sort(key=lambda x: x[0], reverse=True)
+
+    if unread_events:
+        alert_text = "\n".join([f"- {msg}" for _, msg, _ in unread_events])
+        left, right = st.columns([4, 1])
+        with left:
+            st.success(f"🎯 New Target Alerts\n{alert_text}")
+        with right:
+            if st.button("Mark Read", key="mark_target_alerts_read", use_container_width=True):
+                st.session_state.portfolio_store.mark_all_target_alerts_read()
+                st.rerun()
+
+    if show_read and read_events:
+        read_text = "\n".join([f"- {msg}" for _, msg, _ in read_events[:10]])
+        st.info(f"✅ Read Target Alerts\n{read_text}")
+
+    return {"unread": len(unread_events), "read": len(read_events)}
 
 
 def format_recommendation(rec):
@@ -535,19 +651,24 @@ def display_portfolio_panel():
                     st.error(str(err))
 
     # ── Load & enrich holdings ──────────────────────────────────────
-    all_holdings = store.get_all_holdings()
-    for h in all_holdings:
-        if not h.portfolio_type:
-            h.portfolio_type = "MIDTERM"
-        if not h.broker_account:
-            h.broker_account = "ZERODHA"
+    snapshot = st.session_state.get("portfolio_snapshot")
+    if snapshot:
+        all_holdings = snapshot["all_holdings"]
+        active_holdings = snapshot["active_holdings"]
+        sold_holdings = snapshot["sold_holdings"]
+    else:
+        all_holdings = store.get_all_holdings()
+        for h in all_holdings:
+            if not h.portfolio_type:
+                h.portfolio_type = "MIDTERM"
+            if not h.broker_account:
+                h.broker_account = "ZERODHA"
 
-    active_holdings = [h for h in all_holdings if not h.is_sold]
-    sold_holdings = [h for h in all_holdings if h.is_sold]
+        active_holdings = [h for h in all_holdings if not h.is_sold]
+        sold_holdings = [h for h in all_holdings if h.is_sold]
 
-    # Enrich active holdings with live prices
-    if active_holdings:
-        active_holdings = store.enrich_with_prices(active_holdings)
+        if active_holdings:
+            active_holdings = store.enrich_with_prices(active_holdings)
 
     # ── Portfolio Summary ───────────────────────────────────────────
     summary = store.compute_summary(active_holdings + sold_holdings)
@@ -706,7 +827,12 @@ def display_portfolio_panel():
                 if h.target_2_achieved:
                     target_status = "2nd target achieved"
                 elif h.target_1_achieved:
-                    target_status = "1st target achieved"
+                    if h.target_2_price is not None and h.partial_sold_quantity > 0:
+                        target_status = "Waiting for 2nd target"
+                    elif h.target_2_price is not None:
+                        target_status = "1st target achieved"
+                    else:
+                        target_status = "Final target achieved"
 
             pl_value = h.realized_pl if sold else h.unrealized_pl
             if pl_value > 0:
@@ -737,8 +863,6 @@ def display_portfolio_panel():
             status = str(row.get("Target Status", ""))
             if status == "2nd target achieved":
                 return ["background-color: #f3e8ff"] * len(row)
-            if status == "1st target achieved":
-                return ["background-color: #fff4de"] * len(row)
             return [""] * len(row)
 
         styled_df = df.style.apply(_highlight_target_row, axis=1)
@@ -775,6 +899,8 @@ def display_portfolio_panel():
                     for h in quick_action_holdings:
                         sell_30_qty = int(round(h.remaining_quantity * 0.30))
                         sell_50_qty = int(round(h.remaining_quantity * 0.50))
+                        sell_100_qty = int(round(h.remaining_quantity))
+                        single_target = h.target_2_price is None
 
                         act_col1, act_col2, act_col3, act_col4 = st.columns([2.8, 1.2, 1.2, 2.8])
                         with act_col1:
@@ -782,36 +908,58 @@ def display_portfolio_panel():
                                 f"**{h.ticker}** ({h.company_name}) | Remaining: {h.remaining_quantity:.2f}"
                             )
                         with act_col2:
-                            if st.button(
-                                f"Sell 30% ({sell_30_qty})",
-                                key=f"compact_ps30_{h.id}",
-                                use_container_width=True,
-                            ):
-                                if sell_30_qty <= 0:
-                                    st.error("30% results in 0 whole shares for this holding.")
-                                else:
-                                    k = f"partial_sell_open_compact_{h.id}_30"
-                                    st.session_state.partial_sell_form_open[k] = True
-                                    st.rerun()
+                            if single_target:
+                                if st.button(
+                                    f"Sell 100% ({sell_100_qty})",
+                                    key=f"compact_ps100_{h.id}",
+                                    use_container_width=True,
+                                ):
+                                    if sell_100_qty <= 0:
+                                        st.error("100% results in 0 whole shares for this holding.")
+                                    else:
+                                        k = f"partial_sell_open_compact_{h.id}_100"
+                                        st.session_state.partial_sell_form_open[k] = True
+                                        st.rerun()
+                            else:
+                                if st.button(
+                                    f"Sell 30% ({sell_30_qty})",
+                                    key=f"compact_ps30_{h.id}",
+                                    use_container_width=True,
+                                ):
+                                    if sell_30_qty <= 0:
+                                        st.error("30% results in 0 whole shares for this holding.")
+                                    else:
+                                        k = f"partial_sell_open_compact_{h.id}_30"
+                                        st.session_state.partial_sell_form_open[k] = True
+                                        st.rerun()
                         with act_col3:
-                            if st.button(
-                                f"Sell 50% ({sell_50_qty})",
-                                key=f"compact_ps50_{h.id}",
-                                use_container_width=True,
-                            ):
-                                if sell_50_qty <= 0:
-                                    st.error("50% results in 0 whole shares for this holding.")
-                                else:
-                                    k = f"partial_sell_open_compact_{h.id}_50"
-                                    st.session_state.partial_sell_form_open[k] = True
-                                    st.rerun()
+                            if single_target:
+                                st.caption("Single target")
+                            else:
+                                if st.button(
+                                    f"Sell 50% ({sell_50_qty})",
+                                    key=f"compact_ps50_{h.id}",
+                                    use_container_width=True,
+                                ):
+                                    if sell_50_qty <= 0:
+                                        st.error("50% results in 0 whole shares for this holding.")
+                                    else:
+                                        k = f"partial_sell_open_compact_{h.id}_50"
+                                        st.session_state.partial_sell_form_open[k] = True
+                                        st.rerun()
                         with act_col4:
-                            st.caption(
-                                f"Suggested whole shares: 30%={sell_30_qty}, 50%={sell_50_qty}"
-                            )
+                            if single_target:
+                                st.caption("Only one target set. Full exit (100%) required.")
+                            else:
+                                st.caption(
+                                    f"Suggested whole shares: 30%={sell_30_qty}, 50%={sell_50_qty}"
+                                )
 
-                        _render_partial_sell_confirm_form(h, 30.0, sell_30_qty, "compact")
-                        _render_partial_sell_confirm_form(h, 50.0, sell_50_qty, "compact")
+                        if single_target:
+                            _render_partial_sell_confirm_form(h, 100.0, sell_100_qty, "compact")
+                        else:
+                            _render_partial_sell_confirm_form(h, 30.0, sell_30_qty, "compact")
+                            _render_partial_sell_confirm_form(h, 50.0, sell_50_qty, "compact")
 
             for h in active_holdings if active_view_mode == "Detailed Cards" else []:
                 pl_pct = h.unrealized_pl_pct
@@ -857,36 +1005,68 @@ def display_portfolio_panel():
                 if h.target_1_achieved and h.remaining_quantity > 0:
                     sell_30_qty = int(round(h.remaining_quantity * 0.30))
                     sell_50_qty = int(round(h.remaining_quantity * 0.50))
-                    st.caption(
-                        f"Partial sell suggestion: 30% = {sell_30_qty} shares, "
-                        f"50% = {sell_50_qty} shares"
-                    )
+                    sell_100_qty = int(round(h.remaining_quantity))
+                    single_target = h.target_2_price is None
+
+                    if single_target:
+                        st.caption(f"Single target stock: sell 100% ({sell_100_qty} shares)")
+                    else:
+                        st.caption(
+                            f"Partial sell suggestion: 30% = {sell_30_qty} shares, "
+                            f"50% = {sell_50_qty} shares"
+                        )
 
                     ps_col1, ps_col2 = st.columns(2)
                     with ps_col1:
-                        if st.button(f"Sell 30% ({sell_30_qty})", key=f"ps30_{h.id}", use_container_width=True):
-                            if sell_30_qty <= 0:
-                                st.error("30% results in 0 whole shares for this holding.")
-                            else:
-                                k = f"partial_sell_open_detail_{h.id}_30"
-                                st.session_state.partial_sell_form_open[k] = True
-                                st.rerun()
+                        if single_target:
+                            if st.button(f"Sell 100% ({sell_100_qty})", key=f"ps100_{h.id}", use_container_width=True):
+                                if sell_100_qty <= 0:
+                                    st.error("100% results in 0 whole shares for this holding.")
+                                else:
+                                    k = f"partial_sell_open_detail_{h.id}_100"
+                                    st.session_state.partial_sell_form_open[k] = True
+                                    st.rerun()
+                        else:
+                            if st.button(f"Sell 30% ({sell_30_qty})", key=f"ps30_{h.id}", use_container_width=True):
+                                if sell_30_qty <= 0:
+                                    st.error("30% results in 0 whole shares for this holding.")
+                                else:
+                                    k = f"partial_sell_open_detail_{h.id}_30"
+                                    st.session_state.partial_sell_form_open[k] = True
+                                    st.rerun()
 
                     with ps_col2:
-                        if st.button(f"Sell 50% ({sell_50_qty})", key=f"ps50_{h.id}", use_container_width=True):
-                            if sell_50_qty <= 0:
-                                st.error("50% results in 0 whole shares for this holding.")
-                            else:
-                                k = f"partial_sell_open_detail_{h.id}_50"
-                                st.session_state.partial_sell_form_open[k] = True
-                                st.rerun()
+                        if single_target:
+                            st.caption("Single target")
+                        else:
+                            if st.button(f"Sell 50% ({sell_50_qty})", key=f"ps50_{h.id}", use_container_width=True):
+                                if sell_50_qty <= 0:
+                                    st.error("50% results in 0 whole shares for this holding.")
+                                else:
+                                    k = f"partial_sell_open_detail_{h.id}_50"
+                                    st.session_state.partial_sell_form_open[k] = True
+                                    st.rerun()
 
-                    _render_partial_sell_confirm_form(h, 30.0, sell_30_qty, "detail")
-                    _render_partial_sell_confirm_form(h, 50.0, sell_50_qty, "detail")
+                    if single_target:
+                        _render_partial_sell_confirm_form(h, 100.0, sell_100_qty, "detail")
+                    else:
+                        _render_partial_sell_confirm_form(h, 30.0, sell_30_qty, "detail")
+                        _render_partial_sell_confirm_form(h, 50.0, sell_50_qty, "detail")
 
                 btn_col1, btn_col2, form_col = st.columns([1, 1, 4])
                 with btn_col1:
-                    if st.button("Sell", key=f"sell_btn_{h.id}", use_container_width=True):
+                    is_single_target_full_exit = (
+                        h.target_1_achieved
+                        and h.target_2_price is None
+                        and h.remaining_quantity > 0
+                        and not h.is_sold
+                    )
+                    sell_button_label = (
+                        f"Sell 100% ({h.remaining_quantity:.2f})"
+                        if is_single_target_full_exit
+                        else "Sell"
+                    )
+                    if st.button(sell_button_label, key=f"sell_btn_{h.id}", use_container_width=True):
                         st.session_state.sell_form_open[h.id] = not st.session_state.sell_form_open.get(h.id, False)
                         st.rerun()
 
@@ -977,6 +1157,19 @@ def display_portfolio_panel():
 # Main UI
 st.title("📈 Stock Research AI")
 st.markdown("Powered by Groq LLM, Yahoo Finance, and Screener.in")
+refresh_minutes = int(st.session_state.get("auto_refresh_minutes", AUTO_REFRESH_DEFAULT_MINUTES))
+enable_auto_refresh(refresh_minutes * 60 * 1000)
+
+portfolio_snapshot = build_portfolio_snapshot()
+alert_counts = render_target_hit_notifications(
+    portfolio_snapshot["active_holdings"],
+    show_read=bool(st.session_state.get("show_read_target_alerts", False)),
+)
+st.caption(
+    f"Auto-refresh every {refresh_minutes} minutes. "
+    f"New target alerts: {alert_counts['unread']} | Read alerts: {alert_counts['read']} | "
+    f"Last refresh: {portfolio_snapshot['refreshed_at'].strftime('%Y-%m-%d %H:%M:%S')}"
+)
 
 # Disclaimer
 with st.expander("⚠️ IMPORTANT DISCLAIMER", expanded=False):
@@ -992,6 +1185,23 @@ workspace_tab_research, workspace_tab_portfolio = st.tabs(["Research", "Portfoli
 # Sidebar for search and history
 with st.sidebar:
     st.header("Search & History")
+
+    st.subheader("Live Updates")
+    refresh_options = [5, 10, 15, 30, 60]
+    current_refresh = int(st.session_state.get("auto_refresh_minutes", AUTO_REFRESH_DEFAULT_MINUTES))
+    if current_refresh not in refresh_options:
+        current_refresh = AUTO_REFRESH_DEFAULT_MINUTES
+
+    st.selectbox(
+        "Auto-refresh interval (minutes)",
+        refresh_options,
+        index=refresh_options.index(current_refresh),
+        key="auto_refresh_minutes",
+    )
+    st.checkbox("Show read target alerts", key="show_read_target_alerts")
+    if st.button("Refresh Prices Now", use_container_width=True):
+        st.rerun()
+    st.divider()
     
     # Search input
     search_query = st.text_input(

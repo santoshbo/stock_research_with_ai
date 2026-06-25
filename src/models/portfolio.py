@@ -27,6 +27,8 @@ class PortfolioHolding:
     target_2_achieved: bool = False
     target_1_achieved_at: Optional[datetime] = None
     target_2_achieved_at: Optional[datetime] = None
+    target_1_notified: bool = False
+    target_2_notified: bool = False
 
     # Partial profit-booking tracking
     partial_sold_quantity: float = 0.0

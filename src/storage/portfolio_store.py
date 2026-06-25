@@ -49,6 +49,8 @@ class PortfolioStore:
                     target_2_achieved INTEGER NOT NULL DEFAULT 0,
                     target_1_achieved_at TEXT,
                     target_2_achieved_at TEXT,
+                    target_1_notified INTEGER NOT NULL DEFAULT 0,
+                    target_2_notified INTEGER NOT NULL DEFAULT 0,
                     partial_sold_quantity REAL NOT NULL DEFAULT 0,
                     partial_realized_pl REAL NOT NULL DEFAULT 0,
                     is_sold     INTEGER NOT NULL DEFAULT 0,
@@ -68,6 +70,8 @@ class PortfolioStore:
                 "target_2_achieved": "INTEGER NOT NULL DEFAULT 0",
                 "target_1_achieved_at": "TEXT",
                 "target_2_achieved_at": "TEXT",
+                "target_1_notified": "INTEGER NOT NULL DEFAULT 0",
+                "target_2_notified": "INTEGER NOT NULL DEFAULT 0",
                 "partial_sold_quantity": "REAL NOT NULL DEFAULT 0",
                 "partial_realized_pl": "REAL NOT NULL DEFAULT 0",
             }
@@ -286,6 +290,8 @@ class PortfolioStore:
                     target_2_achieved,
                     target_1_achieved_at,
                     target_2_achieved_at,
+                    target_1_notified,
+                    target_2_notified,
                     partial_sold_quantity,
                     partial_realized_pl,
                     is_sold,
@@ -322,6 +328,8 @@ class PortfolioStore:
             target_2_achieved,
             target_1_achieved_at,
             target_2_achieved_at,
+            target_1_notified,
+            target_2_notified,
             partial_sold_quantity,
             partial_realized_pl,
             is_sold,
@@ -345,6 +353,8 @@ class PortfolioStore:
             target_2_achieved=bool(target_2_achieved),
             target_1_achieved_at=datetime.fromisoformat(target_1_achieved_at) if target_1_achieved_at else None,
             target_2_achieved_at=datetime.fromisoformat(target_2_achieved_at) if target_2_achieved_at else None,
+            target_1_notified=bool(target_1_notified),
+            target_2_notified=bool(target_2_notified),
             partial_sold_quantity=float(partial_sold_quantity or 0),
             partial_realized_pl=float(partial_realized_pl or 0),
             is_sold=bool(is_sold),
@@ -477,7 +487,8 @@ class PortfolioStore:
                 UPDATE holdings
                 SET
                     partial_sold_quantity = partial_sold_quantity + ?,
-                    partial_realized_pl = partial_realized_pl + ?
+                    partial_realized_pl = partial_realized_pl + ?,
+                    target_1_notified = CASE WHEN target_1_achieved = 1 THEN 1 ELSE target_1_notified END
                 WHERE id = ? AND is_sold = 0
                 """,
                 (sold_qty, realized, holding_id),
@@ -547,6 +558,8 @@ class PortfolioStore:
                 target_2_achieved,
                 target_1_achieved_at,
                 target_2_achieved_at,
+                target_1_notified,
+                target_2_notified,
                 partial_sold_quantity,
                 partial_realized_pl,
                 is_sold,
@@ -581,6 +594,8 @@ class PortfolioStore:
                 target_2_achieved,
                 target_1_achieved_at,
                 target_2_achieved_at,
+                target_1_notified,
+                target_2_notified,
                 partial_sold_quantity,
                 partial_realized_pl,
                 is_sold,
@@ -604,6 +619,8 @@ class PortfolioStore:
                     target_2_achieved=bool(target_2_achieved),
                     target_1_achieved_at=datetime.fromisoformat(target_1_achieved_at) if target_1_achieved_at else None,
                     target_2_achieved_at=datetime.fromisoformat(target_2_achieved_at) if target_2_achieved_at else None,
+                    target_1_notified=bool(target_1_notified),
+                    target_2_notified=bool(target_2_notified),
                     partial_sold_quantity=float(partial_sold_quantity or 0),
                     partial_realized_pl=float(partial_realized_pl or 0),
                     is_sold=bool(is_sold),
@@ -734,26 +751,47 @@ class PortfolioStore:
                 conn.execute(
                     """
                     UPDATE holdings
-                    SET target_1_achieved = 1, target_1_achieved_at = ?
+                    SET target_1_achieved = 1, target_1_achieved_at = ?, target_1_notified = 0
                     WHERE id = ?
                     """,
                     (now, holding.id),
                 )
                 holding.target_1_achieved = True
                 holding.target_1_achieved_at = datetime.fromisoformat(now)
+                holding.target_1_notified = False
 
             if mark_t2:
                 conn.execute(
                     """
                     UPDATE holdings
-                    SET target_2_achieved = 1, target_2_achieved_at = ?
+                    SET target_2_achieved = 1, target_2_achieved_at = ?, target_2_notified = 0
                     WHERE id = ?
                     """,
                     (now, holding.id),
                 )
                 holding.target_2_achieved = True
                 holding.target_2_achieved_at = datetime.fromisoformat(now)
+                holding.target_2_notified = False
 
+            conn.commit()
+
+    def mark_all_target_alerts_read(self) -> None:
+        """Mark all achieved target alerts as read."""
+        with self._conn() as conn:
+            conn.execute(
+                """
+                UPDATE holdings
+                SET target_1_notified = 1
+                WHERE target_1_achieved = 1 AND target_1_notified = 0
+                """
+            )
+            conn.execute(
+                """
+                UPDATE holdings
+                SET target_2_notified = 1
+                WHERE target_2_achieved = 1 AND target_2_notified = 0
+                """
+            )
             conn.commit()
 
     # ------------------------------------------------------------------
