@@ -16,9 +16,15 @@ Always do your own research and consult a qualified financial advisor before mak
 
 ## What Is New
 
-- Portfolio management panel with add, sell, and remove actions
+- Portfolio management panel with add, sell, partial-sell, and remove actions
 - Persistent portfolio storage in SQLite
 - Realized and unrealized P&L tracking with active/sold tabs
+- Dual targets per holding (target 1 and target 2) with automatic achievement marking
+- Target-based visual highlighting in portfolio cards
+- Partial sell helpers for 30% and 50% after target 1, with whole-share rounding
+- Portfolio buckets: Swing Trade, Midterm, and Long Term
+- Broker account tagging per holding: Zerodha, 5Paisa, and Upstox
+- Per-portfolio invested amount and P&L summaries
 - Auto ticker resolution for Indian equities (for example, raw ticker to .NS/.BO when needed)
 - Interactive charts for:
   - financial trends
@@ -200,11 +206,14 @@ App default URL: http://localhost:8501
 
 ## Portfolio Workflow
 
-- Add holdings with quantity, buy price, and currency
+- Add holdings with quantity, buy price, currency, portfolio bucket, broker account, and optional target 1 and target 2
 - View active holdings with live price enrichment
+- Automatic highlight when target 1 or target 2 is achieved
+- Partially sell on target 1 (30% or 50%) with rounded whole-share quantities
 - Sell holdings and track realized P&L
 - Remove active holdings
 - View summarized invested value, unrealized P&L, and realized P&L
+- View separate invested and P&L summary for Swing Trade, Midterm, and Long Term portfolios
 
 Portfolio data is stored locally in .cache/portfolio.db.
 

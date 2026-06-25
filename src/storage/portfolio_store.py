@@ -40,12 +40,40 @@ class PortfolioStore:
                     quantity    REAL    NOT NULL,
                     buying_price REAL   NOT NULL,
                     currency    TEXT    NOT NULL DEFAULT 'USD',
+                    portfolio_type TEXT NOT NULL DEFAULT 'MIDTERM',
+                    broker_account TEXT NOT NULL DEFAULT 'ZERODHA',
                     date_purchased TEXT NOT NULL,
+                    target_1_price REAL,
+                    target_2_price REAL,
+                    target_1_achieved INTEGER NOT NULL DEFAULT 0,
+                    target_2_achieved INTEGER NOT NULL DEFAULT 0,
+                    target_1_achieved_at TEXT,
+                    target_2_achieved_at TEXT,
+                    partial_sold_quantity REAL NOT NULL DEFAULT 0,
+                    partial_realized_pl REAL NOT NULL DEFAULT 0,
                     is_sold     INTEGER NOT NULL DEFAULT 0,
                     sell_price  REAL,
                     sell_date   TEXT
                 )
             """)
+
+            # Lightweight schema migration for existing DBs.
+            existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(holdings)").fetchall()}
+            required_columns = {
+                "portfolio_type": "TEXT NOT NULL DEFAULT 'MIDTERM'",
+                "broker_account": "TEXT NOT NULL DEFAULT 'ZERODHA'",
+                "target_1_price": "REAL",
+                "target_2_price": "REAL",
+                "target_1_achieved": "INTEGER NOT NULL DEFAULT 0",
+                "target_2_achieved": "INTEGER NOT NULL DEFAULT 0",
+                "target_1_achieved_at": "TEXT",
+                "target_2_achieved_at": "TEXT",
+                "partial_sold_quantity": "REAL NOT NULL DEFAULT 0",
+                "partial_realized_pl": "REAL NOT NULL DEFAULT 0",
+            }
+            for col_name, col_def in required_columns.items():
+                if col_name not in existing_cols:
+                    conn.execute(f"ALTER TABLE holdings ADD COLUMN {col_name} {col_def}")
             conn.commit()
 
     def _conn(self) -> sqlite3.Connection:
@@ -160,7 +188,11 @@ class PortfolioStore:
         buying_price: float,
         currency: str = "INR",
         date_purchased: Optional[datetime] = None,
+        target_1_price: Optional[float] = None,
+        target_2_price: Optional[float] = None,
         auto_resolve: bool = True,
+        portfolio_type: str = "MIDTERM",
+        broker_account: str = "ZERODHA",
     ) -> PortfolioHolding:
         """Add a new stock to the portfolio.
 
@@ -177,8 +209,19 @@ class PortfolioStore:
             cursor = conn.execute(
                 """
                 INSERT INTO holdings
-                    (ticker, company_name, quantity, buying_price, currency, date_purchased)
-                VALUES (?, ?, ?, ?, ?, ?)
+                    (
+                        ticker,
+                        company_name,
+                        quantity,
+                        buying_price,
+                        currency,
+                        portfolio_type,
+                        broker_account,
+                        date_purchased,
+                        target_1_price,
+                        target_2_price
+                    )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     resolved_ticker,
@@ -186,7 +229,11 @@ class PortfolioStore:
                     quantity,
                     buying_price,
                     currency,
+                    portfolio_type,
+                    broker_account,
                     date_purchased.isoformat(),
+                    target_1_price,
+                    target_2_price,
                 ),
             )
             conn.commit()
@@ -200,8 +247,95 @@ class PortfolioStore:
             quantity=quantity,
             buying_price=buying_price,
             currency=currency,
+            portfolio_type=portfolio_type,
+            broker_account=broker_account,
             date_purchased=date_purchased,
+            target_1_price=target_1_price,
+            target_2_price=target_2_price,
         )
+
+    def update_holding_targets(
+        self,
+        holding_id: int,
+        target_1_price: Optional[float],
+        target_2_price: Optional[float],
+    ) -> bool:
+        """Update target prices for a holding."""
+        with self._conn() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE holdings
+                SET target_1_price = ?, target_2_price = ?
+                WHERE id = ? AND is_sold = 0
+                """,
+                (target_1_price, target_2_price, holding_id),
+            )
+            conn.commit()
+        return cursor.rowcount > 0
+
+    def partially_sell_holding(
+        self,
+        holding_id: int,
+        sell_percent: float,
+        sell_quantity: Optional[float] = None,
+        sell_price: Optional[float] = None,
+        sell_date: Optional[datetime] = None,
+    ) -> tuple[bool, float, float]:
+        """Partially sell a holding by percent of remaining quantity.
+
+        Returns: (success, sold_quantity, realized_pl)
+        """
+        if sell_percent <= 0 and (sell_quantity is None or sell_quantity <= 0):
+            return False, 0.0, 0.0
+
+        with self._conn() as conn:
+            row = conn.execute(
+                """
+                SELECT ticker, quantity, buying_price, partial_sold_quantity
+                FROM holdings
+                WHERE id = ? AND is_sold = 0
+                """,
+                (holding_id,),
+            ).fetchone()
+
+            if not row:
+                return False, 0.0, 0.0
+
+            ticker, quantity, buying_price, partial_sold_quantity = row
+            remaining_qty = max(float(quantity) - float(partial_sold_quantity or 0), 0.0)
+            if remaining_qty <= 0:
+                return False, 0.0, 0.0
+
+            sold_qty = float(sell_quantity) if sell_quantity is not None else remaining_qty * (sell_percent / 100.0)
+            sold_qty = min(sold_qty, remaining_qty)
+            if sold_qty <= 0:
+                return False, 0.0, 0.0
+
+            effective_sell_price = sell_price
+            if effective_sell_price is None:
+                effective_sell_price = self._fetch_price_for_ticker(ticker)
+            if effective_sell_price is None:
+                return False, 0.0, 0.0
+
+            realized = (float(effective_sell_price) - float(buying_price)) * sold_qty
+            sell_date = sell_date or datetime.now()
+
+            conn.execute(
+                """
+                UPDATE holdings
+                SET
+                    partial_sold_quantity = partial_sold_quantity + ?,
+                    partial_realized_pl = partial_realized_pl + ?
+                WHERE id = ? AND is_sold = 0
+                """,
+                (sold_qty, realized, holding_id),
+            )
+            conn.commit()
+
+        logger.info(
+            f"Partially sold holding id={holding_id}: {sell_percent:.1f}% -> qty={sold_qty:.4f}, realized={realized:.2f}"
+        )
+        return True, sold_qty, realized
 
     def sell_holding(self, holding_id: int, sell_price: float, sell_date: Optional[datetime] = None) -> bool:
         """Mark a holding as sold."""
@@ -244,7 +378,30 @@ class PortfolioStore:
         return self._fetch_holdings(sold=None)
 
     def _fetch_holdings(self, sold: Optional[bool]) -> List[PortfolioHolding]:
-        query = "SELECT id, ticker, company_name, quantity, buying_price, currency, date_purchased, is_sold, sell_price, sell_date FROM holdings"
+        query = """
+            SELECT
+                id,
+                ticker,
+                company_name,
+                quantity,
+                buying_price,
+                currency,
+                portfolio_type,
+                broker_account,
+                date_purchased,
+                target_1_price,
+                target_2_price,
+                target_1_achieved,
+                target_2_achieved,
+                target_1_achieved_at,
+                target_2_achieved_at,
+                partial_sold_quantity,
+                partial_realized_pl,
+                is_sold,
+                sell_price,
+                sell_date
+            FROM holdings
+        """
         params: tuple = ()
         if sold is not None:
             query += " WHERE is_sold = ?"
@@ -256,8 +413,28 @@ class PortfolioStore:
 
         holdings = []
         for row in rows:
-            (hid, ticker, company_name, quantity, buying_price, currency,
-             date_purchased, is_sold, sell_price, sell_date) = row
+            (
+                hid,
+                ticker,
+                company_name,
+                quantity,
+                buying_price,
+                currency,
+                portfolio_type,
+                broker_account,
+                date_purchased,
+                target_1_price,
+                target_2_price,
+                target_1_achieved,
+                target_2_achieved,
+                target_1_achieved_at,
+                target_2_achieved_at,
+                partial_sold_quantity,
+                partial_realized_pl,
+                is_sold,
+                sell_price,
+                sell_date,
+            ) = row
             holdings.append(
                 PortfolioHolding(
                     id=hid,
@@ -266,7 +443,17 @@ class PortfolioStore:
                     quantity=quantity,
                     buying_price=buying_price,
                     currency=currency,
+                    portfolio_type=portfolio_type,
+                    broker_account=broker_account,
                     date_purchased=datetime.fromisoformat(date_purchased),
+                    target_1_price=target_1_price,
+                    target_2_price=target_2_price,
+                    target_1_achieved=bool(target_1_achieved),
+                    target_2_achieved=bool(target_2_achieved),
+                    target_1_achieved_at=datetime.fromisoformat(target_1_achieved_at) if target_1_achieved_at else None,
+                    target_2_achieved_at=datetime.fromisoformat(target_2_achieved_at) if target_2_achieved_at else None,
+                    partial_sold_quantity=float(partial_sold_quantity or 0),
+                    partial_realized_pl=float(partial_realized_pl or 0),
                     is_sold=bool(is_sold),
                     sell_price=sell_price,
                     sell_date=datetime.fromisoformat(sell_date) if sell_date else None,
@@ -366,8 +553,56 @@ class PortfolioStore:
                     holding.current_price = prices[effective]
                 if effective in currencies:
                     holding.currency = currencies[effective]
+                self._update_target_achievements(holding)
 
         return holdings
+
+    def _update_target_achievements(self, holding: PortfolioHolding) -> None:
+        """Persist target achievement flags when live price crosses targets."""
+        if holding.current_price is None or holding.is_sold:
+            return
+
+        mark_t1 = (
+            holding.target_1_price is not None
+            and not holding.target_1_achieved
+            and holding.current_price >= holding.target_1_price
+        )
+        mark_t2 = (
+            holding.target_2_price is not None
+            and not holding.target_2_achieved
+            and holding.current_price >= holding.target_2_price
+        )
+
+        if not (mark_t1 or mark_t2):
+            return
+
+        now = datetime.now().isoformat()
+        with self._conn() as conn:
+            if mark_t1:
+                conn.execute(
+                    """
+                    UPDATE holdings
+                    SET target_1_achieved = 1, target_1_achieved_at = ?
+                    WHERE id = ?
+                    """,
+                    (now, holding.id),
+                )
+                holding.target_1_achieved = True
+                holding.target_1_achieved_at = datetime.fromisoformat(now)
+
+            if mark_t2:
+                conn.execute(
+                    """
+                    UPDATE holdings
+                    SET target_2_achieved = 1, target_2_achieved_at = ?
+                    WHERE id = ?
+                    """,
+                    (now, holding.id),
+                )
+                holding.target_2_achieved = True
+                holding.target_2_achieved_at = datetime.fromisoformat(now)
+
+            conn.commit()
 
     # ------------------------------------------------------------------
     # Summary
@@ -378,8 +613,9 @@ class PortfolioStore:
         summary = PortfolioSummary()
         for h in holdings:
             summary.total_invested += h.total_invested
+            summary.realized_pl += h.realized_pl
             if h.is_sold:
-                summary.realized_pl += h.realized_pl
+                continue
             else:
                 summary.current_value += h.current_value
                 summary.unrealized_pl += h.unrealized_pl

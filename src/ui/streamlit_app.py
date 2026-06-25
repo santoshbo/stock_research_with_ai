@@ -23,9 +23,38 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
 <style>
+    :root {
+        --app-font-size: 16px;
+        --portfolio-font-size: 0.9rem;
+    }
+
     .main {
         max-width: 1200px;
     }
+
+    html, body, [data-testid="stAppViewContainer"] {
+        font-size: var(--app-font-size);
+    }
+
+    [data-testid="stAppViewContainer"] .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    [data-testid="stMetricValue"] {
+        font-size: 1.1rem;
+    }
+
+    [data-testid="stMetricLabel"] {
+        font-size: 0.85rem;
+    }
+
+    [data-testid="stMetricDelta"] {
+        font-size: 0.8rem;
+    }
+
     .metric-card {
         background-color: #f0f2f6;
         padding: 20px;
@@ -58,6 +87,48 @@ st.markdown("""
         padding: 8px;
         margin-bottom: 6px;
         border-left: 3px solid #dee2e6;
+        font-size: var(--portfolio-font-size);
+        line-height: 1.35;
+    }
+
+    @media (max-width: 1200px) {
+        :root {
+            --app-font-size: 15px;
+            --portfolio-font-size: 0.85rem;
+        }
+
+        [data-testid="stAppViewContainer"] .block-container {
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+        }
+    }
+
+    @media (max-width: 900px) {
+        :root {
+            --app-font-size: 14px;
+            --portfolio-font-size: 0.82rem;
+        }
+
+        [data-testid="stHorizontalBlock"] {
+            gap: 0.5rem;
+        }
+
+        [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+    }
+
+    @media (max-width: 640px) {
+        [data-testid="stMetricValue"] {
+            font-size: 1rem;
+        }
+
+        [data-testid="stTabs"] [data-baseweb="tab"] {
+            font-size: 0.82rem;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -80,6 +151,21 @@ if "sell_form_open" not in st.session_state:
 
 if "portfolio_tab" not in st.session_state:
     st.session_state.portfolio_tab = "active"  # "active" or "sold"
+
+
+PORTFOLIO_TYPE_LABELS = {
+    "SWING_TRADE": "Swing Trade",
+    "MIDTERM": "Midterm",
+    "LONG_TERM": "Long Term",
+}
+PORTFOLIO_TYPE_BY_LABEL = {v: k for k, v in PORTFOLIO_TYPE_LABELS.items()}
+
+BROKER_ACCOUNT_LABELS = {
+    "ZERODHA": "Zerodha",
+    "5PAISA": "5Paisa",
+    "UPSTOX": "Upstox",
+}
+BROKER_ACCOUNT_BY_LABEL = {v: k for k, v in BROKER_ACCOUNT_LABELS.items()}
 
 
 def format_recommendation(rec):
@@ -287,6 +373,28 @@ def display_portfolio_panel():
             company_input = st.text_input("Company Name", placeholder="e.g. Apple Inc.")
             qty_input = st.number_input("Quantity", min_value=0.001, step=1.0, format="%.3f")
             price_input = st.number_input("Buying Price", min_value=0.01, step=0.01, format="%.2f")
+            portfolio_label_input = st.selectbox(
+                "Portfolio",
+                ["Swing Trade", "Midterm", "Long Term"],
+            )
+            broker_label_input = st.selectbox(
+                "Broker Account",
+                ["Zerodha", "5Paisa", "Upstox"],
+            )
+            target_1_input = st.number_input(
+                "1st Target Price (Optional)",
+                min_value=0.0,
+                step=0.01,
+                format="%.2f",
+                help="Set 0 to skip",
+            )
+            target_2_input = st.number_input(
+                "2nd Target Price (Optional)",
+                min_value=0.0,
+                step=0.01,
+                format="%.2f",
+                help="Set 0 to skip",
+            )
             currency_input = st.selectbox("Currency", ["INR", "USD", "EUR", "GBP", "JPY", "CAD", "AUD"])
             submitted = st.form_submit_button("Add to Portfolio", use_container_width=True)
 
@@ -299,15 +407,35 @@ def display_portfolio_panel():
                     st.error("Quantity must be greater than 0.")
                 elif price_input <= 0:
                     st.error("Buying price must be greater than 0.")
+                elif target_2_input > 0 and target_1_input <= 0:
+                    st.error("Please set 1st target before 2nd target.")
+                elif target_1_input > 0 and target_2_input > 0 and target_2_input <= target_1_input:
+                    st.error("2nd target should be greater than 1st target.")
                 else:
                     if not c:
                         c = t
-                    store.add_holding(t, c, qty_input, price_input, currency_input)
+                    store.add_holding(
+                        t,
+                        c,
+                        qty_input,
+                        price_input,
+                        currency_input,
+                        target_1_price=target_1_input if target_1_input > 0 else None,
+                        target_2_price=target_2_input if target_2_input > 0 else None,
+                        portfolio_type=PORTFOLIO_TYPE_BY_LABEL[portfolio_label_input],
+                        broker_account=BROKER_ACCOUNT_BY_LABEL[broker_label_input],
+                    )
                     st.success(f"Added {t} × {qty_input} @ {price_input:.2f}")
                     st.rerun()
 
     # ── Load & enrich holdings ──────────────────────────────────────
     all_holdings = store.get_all_holdings()
+    for h in all_holdings:
+        if not h.portfolio_type:
+            h.portfolio_type = "MIDTERM"
+        if not h.broker_account:
+            h.broker_account = "ZERODHA"
+
     active_holdings = [h for h in all_holdings if not h.is_sold]
     sold_holdings = [h for h in all_holdings if h.is_sold]
 
@@ -347,7 +475,32 @@ def display_portfolio_panel():
                 f"{realized_color} {summary.realized_pl:+,.2f}",
             )
 
+        st.markdown("#### Portfolio Buckets")
+        bucket_cols = st.columns(3)
+        for idx, (ptype, plabel) in enumerate(PORTFOLIO_TYPE_LABELS.items()):
+            bucket_holdings = [h for h in (active_holdings + sold_holdings) if (h.portfolio_type or "MIDTERM") == ptype]
+            bucket_summary = store.compute_summary(bucket_holdings)
+            with bucket_cols[idx]:
+                st.markdown(f"**{plabel} ({len(bucket_holdings)})**")
+                st.metric("Invested", f"{bucket_summary.total_invested:,.2f}")
+                st.metric(
+                    "Profit/Loss",
+                    f"{bucket_summary.total_pl:+,.2f}",
+                    delta=f"{bucket_summary.total_pl_pct:+.2f}%",
+                    delta_color="normal",
+                )
+
         st.divider()
+
+    portfolio_filter_label = st.selectbox(
+        "View Portfolio",
+        ["All", "Swing Trade", "Midterm", "Long Term"],
+        key="portfolio_type_filter",
+    )
+    if portfolio_filter_label != "All":
+        selected_type = PORTFOLIO_TYPE_BY_LABEL[portfolio_filter_label]
+        active_holdings = [h for h in active_holdings if (h.portfolio_type or "MIDTERM") == selected_type]
+        sold_holdings = [h for h in sold_holdings if (h.portfolio_type or "MIDTERM") == selected_type]
 
     # ── Tabs: Active / Sold ─────────────────────────────────────────
     tab_active, tab_sold = st.tabs([f"Active ({len(active_holdings)})", f"Sold ({len(sold_holdings)})"])
@@ -361,17 +514,84 @@ def display_portfolio_panel():
                 pl_val = h.unrealized_pl
                 pl_emoji = "🟢" if pl_pct >= 0 else "🔴"
                 border_color = "#09ab15" if pl_pct >= 0 else "#d74e09"
+                bg_color = "#f8f9fa"
+                target_badge = ""
+
+                if h.target_2_achieved:
+                    border_color = "#6f42c1"
+                    bg_color = "#f3e8ff"
+                    target_badge = " | 🎯🎯 2nd target achieved"
+                elif h.target_1_achieved:
+                    border_color = "#f7931e"
+                    bg_color = "#fff4de"
+                    target_badge = " | 🎯 1st target achieved"
+
+                target_line_parts = []
+                if h.target_1_price:
+                    status = "✅" if h.target_1_achieved else "⏳"
+                    target_line_parts.append(f"T1: {h.target_1_price:.2f} {status}")
+                if h.target_2_price:
+                    status = "✅" if h.target_2_achieved else "⏳"
+                    target_line_parts.append(f"T2: {h.target_2_price:.2f} {status}")
+                target_line = " | ".join(target_line_parts) if target_line_parts else "Targets: Not set"
 
                 st.markdown(
                     f"<div style='border-left:3px solid {border_color}; padding:6px 8px; "
-                    f"background:#f8f9fa; border-radius:6px; margin-bottom:4px;'>"
+                    f"background:{bg_color}; border-radius:6px; margin-bottom:4px; font-size:0.86rem; line-height:1.35;'>"
                     f"<b>{h.ticker}</b> — {h.company_name}<br/>"
+                    f"Portfolio: {PORTFOLIO_TYPE_LABELS.get(h.portfolio_type or 'MIDTERM', 'Midterm')}<br/>"
+                    f"Broker: {BROKER_ACCOUNT_LABELS.get(h.broker_account or 'ZERODHA', 'Zerodha')}<br/>"
                     f"Qty: {h.quantity:g} | Buy: {h.buying_price:.2f} | "
-                    f"Now: {f'{h.current_price:.2f}' if h.current_price else '—'}<br/>"
-                    f"{pl_emoji} P&L: <b>{pl_val:+,.2f}</b> ({pl_pct:+.2f}%)"
+                    f"Now: {f'{h.current_price:.2f}' if h.current_price else '—'} | "
+                    f"Remaining: {h.remaining_quantity:g}<br/>"
+                    f"{pl_emoji} P&L: <b>{pl_val:+,.2f}</b> ({pl_pct:+.2f}%){target_badge}<br/>"
+                    f"{target_line}"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
+
+                if h.target_1_achieved and h.remaining_quantity > 0:
+                    sell_30_qty = int(round(h.remaining_quantity * 0.30))
+                    sell_50_qty = int(round(h.remaining_quantity * 0.50))
+                    st.caption(
+                        f"Partial sell suggestion: 30% = {sell_30_qty} shares, "
+                        f"50% = {sell_50_qty} shares"
+                    )
+
+                    ps_col1, ps_col2 = st.columns(2)
+                    with ps_col1:
+                        if st.button(f"Sell 30% ({sell_30_qty})", key=f"ps30_{h.id}", use_container_width=True):
+                            if sell_30_qty <= 0:
+                                st.error("30% results in 0 whole shares for this holding.")
+                            else:
+                                ok, sold_qty, realized = store.partially_sell_holding(
+                                    h.id,
+                                    30.0,
+                                    sell_quantity=float(sell_30_qty),
+                                    sell_price=h.current_price,
+                                )
+                                if ok:
+                                    st.success(f"Sold {int(round(sold_qty))} of {h.ticker}. Realized P&L: {realized:+,.2f}")
+                                    st.rerun()
+                                else:
+                                    st.error("Could not execute partial sell. Try again.")
+
+                    with ps_col2:
+                        if st.button(f"Sell 50% ({sell_50_qty})", key=f"ps50_{h.id}", use_container_width=True):
+                            if sell_50_qty <= 0:
+                                st.error("50% results in 0 whole shares for this holding.")
+                            else:
+                                ok, sold_qty, realized = store.partially_sell_holding(
+                                    h.id,
+                                    50.0,
+                                    sell_quantity=float(sell_50_qty),
+                                    sell_price=h.current_price,
+                                )
+                                if ok:
+                                    st.success(f"Sold {int(round(sold_qty))} of {h.ticker}. Realized P&L: {realized:+,.2f}")
+                                    st.rerun()
+                                else:
+                                    st.error("Could not execute partial sell. Try again.")
 
                 btn_col, form_col = st.columns([1, 2])
                 with btn_col:
@@ -423,8 +643,10 @@ def display_portfolio_panel():
 
                 st.markdown(
                     f"<div style='border-left:3px solid {border_color}; padding:6px 8px; "
-                    f"background:#f8f9fa; border-radius:6px; margin-bottom:4px;'>"
+                    f"background:#f8f9fa; border-radius:6px; margin-bottom:4px; font-size:0.86rem; line-height:1.35;'>"
                     f"<b>{h.ticker}</b> — {h.company_name}<br/>"
+                    f"Portfolio: {PORTFOLIO_TYPE_LABELS.get(h.portfolio_type or 'MIDTERM', 'Midterm')}<br/>"
+                    f"Broker: {BROKER_ACCOUNT_LABELS.get(h.broker_account or 'ZERODHA', 'Zerodha')}<br/>"
                     f"Qty: {h.quantity:g} | Buy: {h.buying_price:.2f} → Sell: {h.sell_price:.2f}<br/>"
                     f"{pl_emoji} P&L: <b>{pl_val:+,.2f}</b> ({pl_pct:+.2f}%) | Sold: {sell_dt}"
                     f"</div>",
@@ -445,7 +667,7 @@ with st.expander("⚠️ IMPORTANT DISCLAIMER", expanded=False):
     )
 
 # Two-column layout: research area (left) + portfolio (right)
-main_col, portfolio_col = st.columns([3, 1.3], gap="large")
+main_col, portfolio_col = st.columns([2.6, 1.6], gap="medium")
 
 # Sidebar for search and history
 with st.sidebar:
@@ -507,6 +729,8 @@ with st.sidebar:
 
 # ── Main research content ────────────────────────────────────────────────
 with main_col:
+    analysis = st.session_state.last_analysis
+
     if search_button and ticker:
         st.session_state.research_in_progress = True
 
@@ -534,96 +758,132 @@ with main_col:
 
             st.success(f"✓ Research complete for {ticker}")
 
-            # Quick-add to portfolio button
-            with st.expander("➕ Add to Portfolio", expanded=False):
-                with st.form("quick_add_form", clear_on_submit=True):
-                    qa_qty = st.number_input("Quantity", min_value=0.001, step=1.0, format="%.3f", key="qa_qty")
-                    qa_price = st.number_input(
-                        "Buying Price",
-                        value=float(f"{analysis.metrics.current_price:.2f}"),
-                        min_value=0.01,
-                        step=0.01,
-                        format="%.2f",
-                        key="qa_price",
-                    )
-                    if st.form_submit_button("Add to Portfolio", use_container_width=True):
+        elif progress.error:
+            st.error(f"Research failed: {progress.error}")
+
+        st.session_state.research_in_progress = False
+
+    if analysis:
+        # Quick-add to portfolio button
+        with st.expander("➕ Add to Portfolio", expanded=False):
+            with st.form("quick_add_form", clear_on_submit=True):
+                qa_qty = st.number_input("Quantity", min_value=0.001, step=1.0, format="%.3f", key="qa_qty")
+                qa_price = st.number_input(
+                    "Buying Price",
+                    value=float(f"{analysis.metrics.current_price:.2f}"),
+                    min_value=0.01,
+                    step=0.01,
+                    format="%.2f",
+                    key="qa_price",
+                )
+                qa_portfolio_label = st.selectbox(
+                    "Portfolio",
+                    ["Swing Trade", "Midterm", "Long Term"],
+                    key="qa_portfolio",
+                )
+                qa_broker_label = st.selectbox(
+                    "Broker Account",
+                    ["Zerodha", "5Paisa", "Upstox"],
+                    key="qa_broker",
+                )
+                qa_target_1 = st.number_input(
+                    "1st Target Price (Optional)",
+                    min_value=0.0,
+                    step=0.01,
+                    format="%.2f",
+                    key="qa_target_1",
+                    help="Set 0 to skip",
+                )
+                qa_target_2 = st.number_input(
+                    "2nd Target Price (Optional)",
+                    min_value=0.0,
+                    step=0.01,
+                    format="%.2f",
+                    key="qa_target_2",
+                    help="Set 0 to skip",
+                )
+                if st.form_submit_button("Add to Portfolio", use_container_width=True):
+                    if qa_target_2 > 0 and qa_target_1 <= 0:
+                        st.error("Please set 1st target before 2nd target.")
+                    elif qa_target_1 > 0 and qa_target_2 > 0 and qa_target_2 <= qa_target_1:
+                        st.error("2nd target should be greater than 1st target.")
+                    else:
                         st.session_state.portfolio_store.add_holding(
                             ticker=analysis.ticker,
                             company_name=analysis.metrics.company_name or analysis.ticker,
                             quantity=qa_qty,
                             buying_price=qa_price,
                             currency=analysis.metrics.currency or "INR",
+                            target_1_price=qa_target_1 if qa_target_1 > 0 else None,
+                            target_2_price=qa_target_2 if qa_target_2 > 0 else None,
+                            portfolio_type=PORTFOLIO_TYPE_BY_LABEL[qa_portfolio_label],
+                            broker_account=BROKER_ACCOUNT_BY_LABEL[qa_broker_label],
                             auto_resolve=False,  # ticker from research is already resolved
                         )
                         st.success(f"Added {analysis.ticker} to portfolio!")
                         st.rerun()
 
-            # Main content tabs
-            tab1, tab2, tab3, tab4, tab5 = st.tabs(
-                ["Overview", "Financials", "Recommendation", "Trading", "Risk"]
-            )
+        # Main content tabs
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(
+            ["Overview", "Financials", "Recommendation", "Trading", "Risk"]
+        )
 
-            with tab1:
-                col1, col2, col3, col4, col5 = st.columns(5)
+        with tab1:
+            col1, col2, col3, col4, col5 = st.columns(5)
 
-                with col1:
-                    st.metric("Current Price", f"{analysis.metrics.current_price:.2f} {analysis.metrics.currency}")
-                with col2:
-                    st.metric("Market Cap", f"${analysis.metrics.market_cap/1e9:.1f}B" if analysis.metrics.market_cap else "N/A")
-                with col3:
-                    st.metric("PE Ratio", f"{analysis.metrics.pe_ratio:.1f}" if analysis.metrics.pe_ratio else "N/A")
-                with col4:
-                    st.metric("52W High", f"{analysis.metrics.week_52_high:.2f}" if analysis.metrics.week_52_high else "N/A")
-                with col5:
-                    st.metric("52W Low", f"{analysis.metrics.week_52_low:.2f}" if analysis.metrics.week_52_low else "N/A")
+            with col1:
+                st.metric("Current Price", f"{analysis.metrics.current_price:.2f} {analysis.metrics.currency}")
+            with col2:
+                st.metric("Market Cap", f"${analysis.metrics.market_cap/1e9:.1f}B" if analysis.metrics.market_cap else "N/A")
+            with col3:
+                st.metric("PE Ratio", f"{analysis.metrics.pe_ratio:.1f}" if analysis.metrics.pe_ratio else "N/A")
+            with col4:
+                st.metric("52W High", f"{analysis.metrics.week_52_high:.2f}" if analysis.metrics.week_52_high else "N/A")
+            with col5:
+                st.metric("52W Low", f"{analysis.metrics.week_52_low:.2f}" if analysis.metrics.week_52_low else "N/A")
 
-                st.subheader("Growth Analysis")
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.write(f"**Revenue Trend:** {analysis.growth_trend.revenue_trend}")
-                with col2:
-                    st.write(f"**Profitability:** {analysis.growth_trend.profitability_trend}")
-                with col3:
-                    st.write(f"**OPM Trend:** {analysis.growth_trend.opm_trend}")
+            st.subheader("Growth Analysis")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.write(f"**Revenue Trend:** {analysis.growth_trend.revenue_trend}")
+            with col2:
+                st.write(f"**Profitability:** {analysis.growth_trend.profitability_trend}")
+            with col3:
+                st.write(f"**OPM Trend:** {analysis.growth_trend.opm_trend}")
 
-                st.info(analysis.growth_trend.summary)
+            st.info(analysis.growth_trend.summary)
 
-            with tab2:
-                st.subheader("3-Year Financial Summary")
-                display_financial_table(analysis)
+        with tab2:
+            st.subheader("3-Year Financial Summary")
+            display_financial_table(analysis)
 
-                if analysis.financial_history:
-                    fin_chart = ChartGenerator.create_financial_trend_chart(
-                        analysis.ticker,
-                        analysis.financial_history
-                    )
-                    if fin_chart:
-                        st.plotly_chart(fin_chart, use_container_width=True)
+            if analysis.financial_history:
+                fin_chart = ChartGenerator.create_financial_trend_chart(
+                    analysis.ticker,
+                    analysis.financial_history
+                )
+                if fin_chart:
+                    st.plotly_chart(fin_chart, use_container_width=True)
 
-                if analysis.recent_announcements:
-                    st.subheader("Recent Announcements")
-                    for ann in analysis.recent_announcements[:5]:
-                        with st.expander(f"{ann.date.strftime('%Y-%m-%d')} - {ann.title}"):
-                            st.write(ann.content or "No content available")
+            if analysis.recent_announcements:
+                st.subheader("Recent Announcements")
+                for ann in analysis.recent_announcements[:5]:
+                    with st.expander(f"{ann.date.strftime('%Y-%m-%d')} - {ann.title}"):
+                        st.write(ann.content or "No content available")
 
-            with tab3:
-                display_recommendation(analysis)
+        with tab3:
+            display_recommendation(analysis)
 
-            with tab4:
-                display_trading_outlook(analysis)
+        with tab4:
+            display_trading_outlook(analysis)
 
-            with tab5:
-                display_risk_analysis(analysis)
+        with tab5:
+            display_risk_analysis(analysis)
 
-            # Report link
-            st.divider()
-            if st.button("📥 View Report", use_container_width=False):
-                st.info(f"Reports saved to: {Config.REPORTS_DIR / ticker.replace('.', '_')}")
-
-        elif progress.error:
-            st.error(f"Research failed: {progress.error}")
-
-        st.session_state.research_in_progress = False
+        # Report link
+        st.divider()
+        if st.button("📥 View Report", use_container_width=False):
+            st.info(f"Reports saved to: {Config.REPORTS_DIR / analysis.ticker.replace('.', '_')}")
 
     # Footer inside main column
     st.divider()
