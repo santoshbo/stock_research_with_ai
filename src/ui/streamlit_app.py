@@ -363,6 +363,33 @@ def display_portfolio_panel():
     """Render the portfolio management panel."""
     store: PortfolioStore = st.session_state.portfolio_store
 
+    if "partial_sell_form_open" not in st.session_state:
+        st.session_state.partial_sell_form_open = {}
+
+    def _parse_positive_float(raw: str, field_name: str) -> float:
+        val = (raw or "").strip()
+        if not val:
+            raise ValueError(f"{field_name} is required.")
+        try:
+            num = float(val)
+        except ValueError as exc:
+            raise ValueError(f"{field_name} must be a valid number.") from exc
+        if num <= 0:
+            raise ValueError(f"{field_name} must be greater than 0.")
+        return num
+
+    def _parse_optional_positive_float(raw: str, field_name: str):
+        val = (raw or "").strip()
+        if not val:
+            return None
+        try:
+            num = float(val)
+        except ValueError as exc:
+            raise ValueError(f"{field_name} must be a valid number.") from exc
+        if num <= 0:
+            raise ValueError(f"{field_name} must be greater than 0 when provided.")
+        return num
+
     st.markdown("## 💼 My Portfolio")
     st.divider()
 
@@ -371,8 +398,8 @@ def display_portfolio_panel():
         with st.form("add_stock_form", clear_on_submit=True):
             ticker_input = st.text_input("Ticker Symbol", placeholder="e.g. AAPL, RELIANCE.NS")
             company_input = st.text_input("Company Name", placeholder="e.g. Apple Inc.")
-            qty_input = st.number_input("Quantity", min_value=0.001, step=1.0, format="%.3f")
-            price_input = st.number_input("Buying Price", min_value=0.01, step=0.01, format="%.2f")
+            qty_input = st.text_input("Quantity", placeholder="e.g. 10")
+            price_input = st.text_input("Buying Price", placeholder="e.g. 1250.50")
             portfolio_label_input = st.selectbox(
                 "Portfolio",
                 ["Swing Trade", "Midterm", "Long Term"],
@@ -381,18 +408,14 @@ def display_portfolio_panel():
                 "Broker Account",
                 ["Zerodha", "5Paisa", "Upstox"],
             )
-            target_1_input = st.number_input(
+            target_1_input = st.text_input(
                 "1st Target Price (Optional)",
-                min_value=0.0,
-                step=0.01,
-                format="%.2f",
+                placeholder="e.g. 1400",
                 help="Set 0 to skip",
             )
-            target_2_input = st.number_input(
+            target_2_input = st.text_input(
                 "2nd Target Price (Optional)",
-                min_value=0.0,
-                step=0.01,
-                format="%.2f",
+                placeholder="e.g. 1550",
                 help="Set 0 to skip",
             )
             currency_input = st.selectbox("Currency", ["INR", "USD", "EUR", "GBP", "JPY", "CAD", "AUD"])
@@ -403,30 +426,39 @@ def display_portfolio_panel():
                 c = company_input.strip()
                 if not t:
                     st.error("Ticker is required.")
-                elif qty_input <= 0:
-                    st.error("Quantity must be greater than 0.")
-                elif price_input <= 0:
-                    st.error("Buying price must be greater than 0.")
-                elif target_2_input > 0 and target_1_input <= 0:
-                    st.error("Please set 1st target before 2nd target.")
-                elif target_1_input > 0 and target_2_input > 0 and target_2_input <= target_1_input:
-                    st.error("2nd target should be greater than 1st target.")
                 else:
-                    if not c:
-                        c = t
-                    store.add_holding(
-                        t,
-                        c,
-                        qty_input,
-                        price_input,
-                        currency_input,
-                        target_1_price=target_1_input if target_1_input > 0 else None,
-                        target_2_price=target_2_input if target_2_input > 0 else None,
-                        portfolio_type=PORTFOLIO_TYPE_BY_LABEL[portfolio_label_input],
-                        broker_account=BROKER_ACCOUNT_BY_LABEL[broker_label_input],
-                    )
-                    st.success(f"Added {t} × {qty_input} @ {price_input:.2f}")
-                    st.rerun()
+                    try:
+                        qty_val = _parse_positive_float(qty_input, "Quantity")
+                        price_val = _parse_positive_float(price_input, "Buying price")
+                        target_1_val = _parse_optional_positive_float(target_1_input, "1st target price")
+                        target_2_val = _parse_optional_positive_float(target_2_input, "2nd target price")
+
+                        if target_2_val is not None and target_1_val is None:
+                            st.error("Please set 1st target before 2nd target.")
+                        elif (
+                            target_1_val is not None
+                            and target_2_val is not None
+                            and target_2_val <= target_1_val
+                        ):
+                            st.error("2nd target should be greater than 1st target.")
+                        else:
+                            if not c:
+                                c = t
+                            store.add_holding(
+                                t,
+                                c,
+                                qty_val,
+                                price_val,
+                                currency_input,
+                                target_1_price=target_1_val,
+                                target_2_price=target_2_val,
+                                portfolio_type=PORTFOLIO_TYPE_BY_LABEL[portfolio_label_input],
+                                broker_account=BROKER_ACCOUNT_BY_LABEL[broker_label_input],
+                            )
+                            st.success(f"Added {t} × {qty_val:g} @ {price_val:.2f}")
+                            st.rerun()
+                    except ValueError as err:
+                        st.error(str(err))
 
     # ── Load & enrich holdings ──────────────────────────────────────
     all_holdings = store.get_all_holdings()
@@ -502,6 +534,137 @@ def display_portfolio_panel():
         active_holdings = [h for h in active_holdings if (h.portfolio_type or "MIDTERM") == selected_type]
         sold_holdings = [h for h in sold_holdings if (h.portfolio_type or "MIDTERM") == selected_type]
 
+    partial_sold_holdings = [h for h in active_holdings if h.partial_sold_quantity > 0]
+
+    def _render_partial_sell_confirm_form(holding, sell_percent: float, default_qty: int, form_key_prefix: str):
+        """Render confirmation form for partial sells with editable qty and price."""
+        open_key = f"partial_sell_open_{form_key_prefix}_{holding.id}_{int(sell_percent)}"
+        if not st.session_state.partial_sell_form_open.get(open_key, False):
+            return
+
+        max_qty = int(max(0, round(holding.remaining_quantity)))
+        if max_qty <= 0:
+            st.warning("No remaining whole shares available to sell.")
+            st.session_state.partial_sell_form_open[open_key] = False
+            return
+
+        default_qty = min(max(1, int(default_qty)), max_qty)
+        suggested_price = float(f"{(holding.current_price or holding.buying_price):.2f}")
+
+        with st.form(f"partial_sell_form_{form_key_prefix}_{holding.id}_{int(sell_percent)}", clear_on_submit=False):
+            c1, c2 = st.columns(2)
+            with c1:
+                sell_qty = st.number_input(
+                    f"Confirm share quantity for {holding.ticker}",
+                    min_value=1,
+                    max_value=max_qty,
+                    value=default_qty,
+                    step=1,
+                    key=f"partial_qty_{form_key_prefix}_{holding.id}_{int(sell_percent)}",
+                )
+            with c2:
+                sell_price = st.number_input(
+                    f"Confirm sell price for {holding.ticker}",
+                    min_value=0.01,
+                    value=suggested_price,
+                    step=0.01,
+                    format="%.2f",
+                    key=f"partial_price_{form_key_prefix}_{holding.id}_{int(sell_percent)}",
+                )
+
+            a1, a2 = st.columns(2)
+            with a1:
+                confirm = st.form_submit_button(f"Confirm Sell {int(sell_percent)}%", use_container_width=True)
+            with a2:
+                cancel = st.form_submit_button("Cancel", use_container_width=True)
+
+            if cancel:
+                st.session_state.partial_sell_form_open[open_key] = False
+                st.rerun()
+
+            if confirm:
+                ok, sold_qty, realized = store.partially_sell_holding(
+                    holding.id,
+                    sell_percent,
+                    sell_quantity=float(sell_qty),
+                    sell_price=float(sell_price),
+                )
+                st.session_state.partial_sell_form_open[open_key] = False
+                if ok:
+                    st.success(
+                        f"Sold {int(round(sold_qty))} of {holding.ticker} @ {float(sell_price):.2f}. "
+                        f"Realized P&L: {realized:+,.2f}"
+                    )
+                    st.rerun()
+                else:
+                    st.error("Could not execute partial sell. Try again.")
+
+    def _render_compact_holdings_table(holdings, sold: bool = False):
+        """Render a dense, paginated table view for easier scanning of many items."""
+        if not holdings:
+            st.info("No holdings to display.")
+            return []
+
+        key_suffix = "sold" if sold else "active"
+        page_size = st.selectbox(
+            "Rows per page",
+            [10, 20, 50],
+            index=1,
+            key=f"rows_per_page_{key_suffix}",
+        )
+        total_pages = max(1, (len(holdings) + page_size - 1) // page_size)
+        page_num = st.number_input(
+            "Page",
+            min_value=1,
+            max_value=total_pages,
+            value=1,
+            step=1,
+            key=f"page_num_{key_suffix}",
+        )
+
+        start = (int(page_num) - 1) * page_size
+        page_holdings = holdings[start:start + page_size]
+
+        rows = []
+        for h in page_holdings:
+            current_or_sell = h.sell_price if sold else (h.current_price if h.current_price is not None else None)
+            target_status = "-"
+            if not sold:
+                if h.target_2_achieved:
+                    target_status = "2nd target achieved"
+                elif h.target_1_achieved:
+                    target_status = "1st target achieved"
+            rows.append(
+                {
+                    "Ticker": h.ticker,
+                    "Company": h.company_name,
+                    "Portfolio": PORTFOLIO_TYPE_LABELS.get(h.portfolio_type or "MIDTERM", "Midterm"),
+                    "Broker": BROKER_ACCOUNT_LABELS.get(h.broker_account or "ZERODHA", "Zerodha"),
+                    "Qty": int(round(h.remaining_quantity if not sold else h.quantity)),
+                    "Buy": round(h.buying_price, 2),
+                    "Now/Sell": round(current_or_sell, 2) if current_or_sell is not None else "-",
+                    "P&L": round(h.realized_pl if sold else h.unrealized_pl, 2),
+                    "P&L %": round(h.realized_pl_pct if sold else h.unrealized_pl_pct, 2),
+                    "Target Status": target_status,
+                }
+            )
+
+        df = pd.DataFrame(rows)
+
+        def _highlight_target_row(row):
+            status = str(row.get("Target Status", ""))
+            if status == "2nd target achieved":
+                return ["background-color: #f3e8ff"] * len(row)
+            if status == "1st target achieved":
+                return ["background-color: #fff4de"] * len(row)
+            return [""] * len(row)
+
+        styled_df = df.style.apply(_highlight_target_row, axis=1)
+        table_height = min(520, 72 + (len(df) * 35))
+        st.dataframe(styled_df, use_container_width=True, height=table_height)
+        st.caption(f"Showing {start + 1}-{start + len(page_holdings)} of {len(holdings)} items")
+        return page_holdings
+
     # ── Tabs: Active / Sold ─────────────────────────────────────────
     tab_active, tab_sold = st.tabs([f"Active ({len(active_holdings)})", f"Sold ({len(sold_holdings)})"])
 
@@ -509,7 +672,66 @@ def display_portfolio_panel():
         if not active_holdings:
             st.info("No active holdings. Add a stock above.")
         else:
-            for h in active_holdings:
+            active_view_mode = st.radio(
+                "Active View",
+                ["Compact Table", "Detailed Cards"],
+                horizontal=True,
+                key="active_holdings_view_mode",
+            )
+
+            if active_view_mode == "Compact Table":
+                compact_page_holdings = _render_compact_holdings_table(active_holdings, sold=False)
+
+                quick_action_holdings = [
+                    h for h in compact_page_holdings
+                    if h.target_1_achieved and h.remaining_quantity > 0 and not h.is_sold
+                ]
+                st.markdown("#### Quick Target Actions")
+                if not quick_action_holdings:
+                    st.info("No holdings on this page are eligible for target-based partial sell.")
+                else:
+                    for h in quick_action_holdings:
+                        sell_30_qty = int(round(h.remaining_quantity * 0.30))
+                        sell_50_qty = int(round(h.remaining_quantity * 0.50))
+
+                        act_col1, act_col2, act_col3, act_col4 = st.columns([2.8, 1.2, 1.2, 2.8])
+                        with act_col1:
+                            st.write(
+                                f"**{h.ticker}** ({h.company_name}) | Remaining: {int(round(h.remaining_quantity))}"
+                            )
+                        with act_col2:
+                            if st.button(
+                                f"Sell 30% ({sell_30_qty})",
+                                key=f"compact_ps30_{h.id}",
+                                use_container_width=True,
+                            ):
+                                if sell_30_qty <= 0:
+                                    st.error("30% results in 0 whole shares for this holding.")
+                                else:
+                                    k = f"partial_sell_open_compact_{h.id}_30"
+                                    st.session_state.partial_sell_form_open[k] = True
+                                    st.rerun()
+                        with act_col3:
+                            if st.button(
+                                f"Sell 50% ({sell_50_qty})",
+                                key=f"compact_ps50_{h.id}",
+                                use_container_width=True,
+                            ):
+                                if sell_50_qty <= 0:
+                                    st.error("50% results in 0 whole shares for this holding.")
+                                else:
+                                    k = f"partial_sell_open_compact_{h.id}_50"
+                                    st.session_state.partial_sell_form_open[k] = True
+                                    st.rerun()
+                        with act_col4:
+                            st.caption(
+                                f"Suggested whole shares: 30%={sell_30_qty}, 50%={sell_50_qty}"
+                            )
+
+                        _render_partial_sell_confirm_form(h, 30.0, sell_30_qty, "compact")
+                        _render_partial_sell_confirm_form(h, 50.0, sell_50_qty, "compact")
+
+            for h in active_holdings if active_view_mode == "Detailed Cards" else []:
                 pl_pct = h.unrealized_pl_pct
                 pl_val = h.unrealized_pl
                 pl_emoji = "🟢" if pl_pct >= 0 else "🔴"
@@ -564,77 +786,93 @@ def display_portfolio_panel():
                             if sell_30_qty <= 0:
                                 st.error("30% results in 0 whole shares for this holding.")
                             else:
-                                ok, sold_qty, realized = store.partially_sell_holding(
-                                    h.id,
-                                    30.0,
-                                    sell_quantity=float(sell_30_qty),
-                                    sell_price=h.current_price,
-                                )
-                                if ok:
-                                    st.success(f"Sold {int(round(sold_qty))} of {h.ticker}. Realized P&L: {realized:+,.2f}")
-                                    st.rerun()
-                                else:
-                                    st.error("Could not execute partial sell. Try again.")
+                                k = f"partial_sell_open_detail_{h.id}_30"
+                                st.session_state.partial_sell_form_open[k] = True
+                                st.rerun()
 
                     with ps_col2:
                         if st.button(f"Sell 50% ({sell_50_qty})", key=f"ps50_{h.id}", use_container_width=True):
                             if sell_50_qty <= 0:
                                 st.error("50% results in 0 whole shares for this holding.")
                             else:
-                                ok, sold_qty, realized = store.partially_sell_holding(
-                                    h.id,
-                                    50.0,
-                                    sell_quantity=float(sell_50_qty),
-                                    sell_price=h.current_price,
-                                )
-                                if ok:
-                                    st.success(f"Sold {int(round(sold_qty))} of {h.ticker}. Realized P&L: {realized:+,.2f}")
-                                    st.rerun()
-                                else:
-                                    st.error("Could not execute partial sell. Try again.")
+                                k = f"partial_sell_open_detail_{h.id}_50"
+                                st.session_state.partial_sell_form_open[k] = True
+                                st.rerun()
 
-                btn_col, form_col = st.columns([1, 2])
-                with btn_col:
-                    toggle_key = f"sell_toggle_{h.id}"
+                    _render_partial_sell_confirm_form(h, 30.0, sell_30_qty, "detail")
+                    _render_partial_sell_confirm_form(h, 50.0, sell_50_qty, "detail")
+
+                btn_col1, btn_col2, form_col = st.columns([1, 1, 4])
+                with btn_col1:
                     if st.button("Sell", key=f"sell_btn_{h.id}", use_container_width=True):
                         st.session_state.sell_form_open[h.id] = not st.session_state.sell_form_open.get(h.id, False)
                         st.rerun()
 
+                with btn_col2:
                     if st.button("Remove", key=f"del_btn_{h.id}", use_container_width=True):
                         store.delete_holding(h.id)
                         st.rerun()
 
                 # Sell price form (shown inline when toggled)
                 if st.session_state.sell_form_open.get(h.id, False):
-                    with st.form(f"sell_form_{h.id}", clear_on_submit=True):
-                        suggested = h.current_price or h.buying_price
-                        sell_price = st.number_input(
-                            "Sell Price",
-                            value=float(f"{suggested:.2f}"),
-                            min_value=0.01,
-                            step=0.01,
-                            format="%.2f",
-                            key=f"sell_price_{h.id}",
-                        )
-                        confirm = st.form_submit_button("Confirm Sell", use_container_width=True)
-                        if confirm:
-                            store.sell_holding(h.id, sell_price)
-                            st.session_state.sell_form_open[h.id] = False
-                            realized = (sell_price - h.buying_price) * h.quantity
-                            emoji = "🟢" if realized >= 0 else "🔴"
-                            st.success(f"{emoji} Sold {h.ticker} — Realized P&L: {realized:+,.2f}")
-                            st.rerun()
+                    with form_col:
+                        with st.form(f"sell_form_{h.id}", clear_on_submit=True):
+                            suggested = h.current_price or h.buying_price
+                            sell_price = st.number_input(
+                                "Sell Price",
+                                value=float(f"{suggested:.2f}"),
+                                min_value=0.01,
+                                step=0.01,
+                                format="%.2f",
+                                key=f"sell_price_{h.id}",
+                            )
+                            confirm = st.form_submit_button("Confirm Sell", use_container_width=True)
+                            if confirm:
+                                store.sell_holding(h.id, sell_price)
+                                st.session_state.sell_form_open[h.id] = False
+                                realized = (sell_price - h.buying_price) * h.quantity
+                                emoji = "🟢" if realized >= 0 else "🔴"
+                                st.success(f"{emoji} Sold {h.ticker} — Realized P&L: {realized:+,.2f}")
+                                st.rerun()
 
     with tab_sold:
-        if not sold_holdings:
+        if not sold_holdings and not partial_sold_holdings:
             st.info("No sold positions yet.")
         else:
-            total_realized = sum(h.realized_pl for h in sold_holdings)
+            total_realized = sum(h.realized_pl for h in sold_holdings) + sum(h.partial_realized_pl for h in partial_sold_holdings)
             emoji = "🟢" if total_realized >= 0 else "🔴"
             st.markdown(f"**Total Realized: {emoji} {total_realized:+,.2f}**")
             st.divider()
 
-            for h in sold_holdings:
+            if partial_sold_holdings:
+                st.markdown("#### Partially Sold (Still Active)")
+                partial_rows = []
+                for h in partial_sold_holdings:
+                    partial_rows.append(
+                        {
+                            "Ticker": h.ticker,
+                            "Company": h.company_name,
+                            "Portfolio": PORTFOLIO_TYPE_LABELS.get(h.portfolio_type or "MIDTERM", "Midterm"),
+                            "Broker": BROKER_ACCOUNT_LABELS.get(h.broker_account or "ZERODHA", "Zerodha"),
+                            "Qty Sold": int(round(h.partial_sold_quantity)),
+                            "Remaining Qty": int(round(h.remaining_quantity)),
+                            "Realized P&L": round(h.partial_realized_pl, 2),
+                        }
+                    )
+                st.dataframe(pd.DataFrame(partial_rows), use_container_width=True, height=min(360, 72 + (35 * len(partial_rows))))
+                st.divider()
+
+            sold_view_mode = st.radio(
+                "Sold View",
+                ["Compact Table", "Detailed Cards"],
+                horizontal=True,
+                key="sold_holdings_view_mode",
+            )
+
+            if sold_view_mode == "Compact Table":
+                _render_compact_holdings_table(sold_holdings, sold=True)
+
+            for h in sold_holdings if sold_view_mode == "Detailed Cards" else []:
                 pl_val = h.realized_pl
                 pl_pct = h.realized_pl_pct
                 pl_emoji = "🟢" if pl_val >= 0 else "🔴"
@@ -666,8 +904,8 @@ with st.expander("⚠️ IMPORTANT DISCLAIMER", expanded=False):
         "Markets involve significant risk of loss. **Always consult a qualified financial advisor before making investment decisions.**"
     )
 
-# Two-column layout: research area (left) + portfolio (right)
-main_col, portfolio_col = st.columns([2.6, 1.6], gap="medium")
+# Top-level workspace tabs so Portfolio can use full page width.
+workspace_tab_research, workspace_tab_portfolio = st.tabs(["Research", "Portfolio"])
 
 # Sidebar for search and history
 with st.sidebar:
@@ -728,7 +966,7 @@ with st.sidebar:
         st.rerun()
 
 # ── Main research content ────────────────────────────────────────────────
-with main_col:
+with workspace_tab_research:
     analysis = st.session_state.last_analysis
 
     if search_button and ticker:
@@ -894,6 +1132,6 @@ with main_col:
 """, unsafe_allow_html=True)
 
 # ── Portfolio panel ──────────────────────────────────────────────────────
-with portfolio_col:
+with workspace_tab_portfolio:
     display_portfolio_panel()
 
