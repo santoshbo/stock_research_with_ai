@@ -217,6 +217,32 @@ App default URL: http://localhost:8501
 
 Portfolio data is stored locally in .cache/portfolio.db.
 
+## Screenshots
+
+### Research Dashboard
+
+![Research dashboard view](screenshots/Screenshot%202026-06-25%20at%2011.45.55%E2%80%AFAM.png)
+
+### Research Result And Insights
+
+![Research results and insights](screenshots/Screenshot%202026-06-25%20at%2011.46.34%E2%80%AFAM.png)
+
+### Portfolio Add/Edit Panel
+
+![Portfolio add or edit panel](screenshots/Screenshot%202026-06-25%20at%2011.46.41%E2%80%AFAM.png)
+
+### Active Holdings Overview
+
+![Active holdings overview](screenshots/Screenshot%202026-06-25%20at%2011.46.53%E2%80%AFAM.png)
+
+### P&L And Targets Tracking
+
+![P&L and targets tracking](screenshots/Screenshot%202026-06-25%20at%2011.47.02%E2%80%AFAM.png)
+
+### History And Report References
+
+![History and report references](screenshots/Screenshot%202026-06-25%20at%2011.47.14%E2%80%AFAM.png)
+
 ## Reports And Storage
 
 - Reports are stored under reports/TICKER/
