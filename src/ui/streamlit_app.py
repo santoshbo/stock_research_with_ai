@@ -634,6 +634,15 @@ def display_portfolio_panel():
                     target_status = "2nd target achieved"
                 elif h.target_1_achieved:
                     target_status = "1st target achieved"
+
+            pl_value = h.realized_pl if sold else h.unrealized_pl
+            if pl_value > 0:
+                pl_display = f"🟢 ▲ {pl_value:,.2f}"
+            elif pl_value < 0:
+                pl_display = f"🔴 ▼ {abs(pl_value):,.2f}"
+            else:
+                pl_display = "⚪ ▶ 0.00"
+
             rows.append(
                 {
                     "Ticker": h.ticker,
@@ -642,8 +651,8 @@ def display_portfolio_panel():
                     "Broker": BROKER_ACCOUNT_LABELS.get(h.broker_account or "ZERODHA", "Zerodha"),
                     "Qty": int(round(h.remaining_quantity if not sold else h.quantity)),
                     "Buy": round(h.buying_price, 2),
-                    "Now/Sell": round(current_or_sell, 2) if current_or_sell is not None else "-",
-                    "P&L": round(h.realized_pl if sold else h.unrealized_pl, 2),
+                    "Current Price": round(current_or_sell, 2) if current_or_sell is not None else "-",
+                    "P&L": pl_display,
                     "P&L %": round(h.realized_pl_pct if sold else h.unrealized_pl_pct, 2),
                     "Target Status": target_status,
                 }
