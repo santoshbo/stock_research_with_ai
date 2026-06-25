@@ -85,6 +85,23 @@ class PortfolioHolding:
             return 0.0
         return (self.realized_pl / self.total_invested) * 100 if self.total_invested else 0.0
 
+    @property
+    def invested_on(self) -> str:
+        """Purchase date in YYYY-MM-DD format."""
+        return self.date_purchased.strftime("%Y-%m-%d")
+
+    @property
+    def days_from_investment(self) -> int:
+        """Number of days from purchase date until today."""
+        return max((datetime.now().date() - self.date_purchased.date()).days, 0)
+
+    @property
+    def days_to_target(self) -> int:
+        """For sold holdings, days between purchase and sell date."""
+        if not self.sell_date:
+            return 0
+        return max((self.sell_date.date() - self.date_purchased.date()).days, 0)
+
 
 @dataclass
 class PortfolioSummary:

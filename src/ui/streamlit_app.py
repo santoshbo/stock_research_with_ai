@@ -15,7 +15,7 @@ from src.storage.portfolio_store import PortfolioStore
 
 # Configure Streamlit page
 st.set_page_config(
-    page_title="Stock Research AI",
+    page_title="Stock Research With AI",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -510,6 +510,7 @@ def display_portfolio_panel():
 
     # ── Add Stock Form ──────────────────────────────────────────────
     with st.expander("➕ Add Stock to Portfolio", expanded=False):
+        st.caption("Investment date is auto-set to today's date when you add a stock.")
         with st.form("add_stock_form", clear_on_submit=True):
             ticker_input = st.text_input("Ticker Symbol", placeholder="e.g. AAPL, RELIANCE.NS")
             company_input = st.text_input("Company Name", placeholder="e.g. Apple Inc.")
@@ -822,6 +823,9 @@ def display_portfolio_panel():
         rows = []
         for h in page_holdings:
             current_or_sell = h.sell_price if sold else (h.current_price if h.current_price is not None else None)
+            invested_on = h.invested_on
+            days_value = h.days_to_target if sold else h.days_from_investment
+            days_label = "Days to Target" if sold else "Days from Investment"
             target_status = "-"
             if not sold:
                 if h.target_2_achieved:
@@ -848,6 +852,8 @@ def display_portfolio_panel():
                     "Company": h.company_name,
                     "Portfolio": PORTFOLIO_TYPE_LABELS.get(h.portfolio_type or "MIDTERM", "Midterm"),
                     "Broker": BROKER_ACCOUNT_LABELS.get(h.broker_account or "ZERODHA", "Zerodha"),
+                    "Invested On": invested_on,
+                    days_label: f"{days_value}",
                     "Qty": f"{(h.remaining_quantity if not sold else h.quantity):.2f}",
                     "Buy": f"{h.buying_price:.2f}",
                     "Current Price": f"{current_or_sell:.2f}" if current_or_sell is not None else "-",
@@ -993,6 +999,7 @@ def display_portfolio_panel():
                     f"<b>{h.ticker}</b> — {h.company_name}<br/>"
                     f"Portfolio: {PORTFOLIO_TYPE_LABELS.get(h.portfolio_type or 'MIDTERM', 'Midterm')}<br/>"
                     f"Broker: {BROKER_ACCOUNT_LABELS.get(h.broker_account or 'ZERODHA', 'Zerodha')}<br/>"
+                    f"Invested On: {h.invested_on} | Days from Investment: {h.days_from_investment}<br/>"
                     f"Qty: {h.quantity:.2f} | Buy: {h.buying_price:.2f} | "
                     f"Now: {f'{h.current_price:.2f}' if h.current_price else '—'} | "
                     f"Remaining: {h.remaining_quantity:.2f}<br/>"
@@ -1116,6 +1123,8 @@ def display_portfolio_panel():
                             "Company": h.company_name,
                             "Portfolio": PORTFOLIO_TYPE_LABELS.get(h.portfolio_type or "MIDTERM", "Midterm"),
                             "Broker": BROKER_ACCOUNT_LABELS.get(h.broker_account or "ZERODHA", "Zerodha"),
+                            "Invested On": h.invested_on,
+                            "Days from Investment": f"{h.days_from_investment}",
                             "Qty Sold": f"{h.partial_sold_quantity:.2f}",
                             "Remaining Qty": f"{h.remaining_quantity:.2f}",
                             "Realized P&L": f"{h.partial_realized_pl:.2f}",
@@ -1147,6 +1156,7 @@ def display_portfolio_panel():
                     f"<b>{h.ticker}</b> — {h.company_name}<br/>"
                     f"Portfolio: {PORTFOLIO_TYPE_LABELS.get(h.portfolio_type or 'MIDTERM', 'Midterm')}<br/>"
                     f"Broker: {BROKER_ACCOUNT_LABELS.get(h.broker_account or 'ZERODHA', 'Zerodha')}<br/>"
+                    f"Invested On: {h.invested_on} | Days to Target: {h.days_to_target}<br/>"
                     f"Qty: {h.quantity:.2f} | Buy: {h.buying_price:.2f} → Sell: {h.sell_price:.2f}<br/>"
                     f"{pl_emoji} P&L: <b>{pl_val:+,.2f}</b> ({pl_pct:+.2f}%) | Sold: {sell_dt}"
                     f"</div>",
@@ -1257,6 +1267,15 @@ with st.sidebar:
         st.session_state.agent.history_store.clear_history()
         st.rerun()
 
+    st.divider()
+    st.markdown("""
+<div style='text-align: center; color: gray; font-size: 0.8em;'>
+    About Me: Santosh Botre<br>
+    <a href='https://www.linkedin.com/in/santoshbotre/' target='_blank' rel='noopener noreferrer'>LinkedIn</a> |
+    <a href='https://github.com/santoshbo' target='_blank' rel='noopener noreferrer'>GitHub</a>
+</div>
+""", unsafe_allow_html=True)
+
 # ── Main research content ────────────────────────────────────────────────
 with workspace_tab_research:
     analysis = st.session_state.last_analysis
@@ -1296,6 +1315,7 @@ with workspace_tab_research:
     if analysis:
         # Quick-add to portfolio button
         with st.expander("➕ Add to Portfolio", expanded=False):
+            st.caption("Investment date is auto-set to today's date when you add this stock.")
             with st.form("quick_add_form", clear_on_submit=True):
                 qa_qty = st.number_input("Quantity", min_value=0.001, step=1.0, format="%.3f", key="qa_qty")
                 qa_price = st.number_input(
@@ -1420,6 +1440,10 @@ with workspace_tab_research:
     st.markdown("""
 <div style='text-align: center; color: gray; font-size: 0.8em;'>
     Stock Research AI v0.1.0 | Data sources: Yahoo Finance, Screener.in | Powered by Groq LLM
+    <br>
+    About Me: Santosh Botre |
+    <a href='https://www.linkedin.com/in/santoshbotre/' target='_blank' rel='noopener noreferrer'>LinkedIn</a> |
+    <a href='https://github.com/santoshbo' target='_blank' rel='noopener noreferrer'>GitHub</a>
 </div>
 """, unsafe_allow_html=True)
 
