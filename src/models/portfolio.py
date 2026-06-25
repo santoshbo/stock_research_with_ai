@@ -17,6 +17,20 @@ class PortfolioHolding:
     date_purchased: datetime
     current_price: Optional[float] = None
     currency: str = "USD"
+    portfolio_type: str = "MIDTERM"
+    broker_account: str = "ZERODHA"
+
+    # Target tracking
+    target_1_price: Optional[float] = None
+    target_2_price: Optional[float] = None
+    target_1_achieved: bool = False
+    target_2_achieved: bool = False
+    target_1_achieved_at: Optional[datetime] = None
+    target_2_achieved_at: Optional[datetime] = None
+
+    # Partial profit-booking tracking
+    partial_sold_quantity: float = 0.0
+    partial_realized_pl: float = 0.0
 
     # Sold position fields
     is_sold: bool = False
@@ -24,15 +38,20 @@ class PortfolioHolding:
     sell_date: Optional[datetime] = None
 
     @property
+    def remaining_quantity(self) -> float:
+        """Quantity still held after any partial sales."""
+        return max(self.quantity - self.partial_sold_quantity, 0.0)
+
+    @property
     def total_invested(self) -> float:
         return self.quantity * self.buying_price
 
     @property
     def current_value(self) -> float:
-        if self.is_sold and self.sell_price is not None:
-            return self.quantity * self.sell_price
+        if self.is_sold:
+            return 0.0
         if self.current_price is not None:
-            return self.quantity * self.current_price
+            return self.remaining_quantity * self.current_price
         return self.total_invested
 
     @property
@@ -40,14 +59,15 @@ class PortfolioHolding:
         """Unrealized profit/loss (only for active holdings)."""
         if self.is_sold or self.current_price is None:
             return 0.0
-        return (self.current_price - self.buying_price) * self.quantity
+        return (self.current_price - self.buying_price) * self.remaining_quantity
 
     @property
     def realized_pl(self) -> float:
         """Realized profit/loss (only for sold holdings)."""
-        if not self.is_sold or self.sell_price is None:
-            return 0.0
-        return (self.sell_price - self.buying_price) * self.quantity
+        realized = self.partial_realized_pl
+        if self.is_sold and self.sell_price is not None:
+            realized += (self.sell_price - self.buying_price) * self.remaining_quantity
+        return realized
 
     @property
     def unrealized_pl_pct(self) -> float:
@@ -59,9 +79,9 @@ class PortfolioHolding:
     @property
     def realized_pl_pct(self) -> float:
         """Realized P&L as percentage."""
-        if not self.is_sold or self.sell_price is None or self.buying_price == 0:
+        if self.buying_price == 0:
             return 0.0
-        return ((self.sell_price - self.buying_price) / self.buying_price) * 100
+        return (self.realized_pl / self.total_invested) * 100 if self.total_invested else 0.0
 
 
 @dataclass
