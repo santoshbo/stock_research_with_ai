@@ -243,6 +243,10 @@ Portfolio data is stored locally in .cache/portfolio.db.
 
 ![History and report references](screenshots/Screenshot%202026-06-25%20at%2011.47.14%E2%80%AFAM.png)
 
+### Swing Trade App View
+
+![Additional app view](screenshots/Screenshot%202026-06-25%20at%2011.49.39%E2%80%AFAM.png)
+
 ## Reports And Storage
 
 - Reports are stored under reports/TICKER/
