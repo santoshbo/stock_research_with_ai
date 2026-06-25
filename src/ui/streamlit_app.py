@@ -188,11 +188,11 @@ def display_financial_table(analysis):
     for fy in analysis.financial_history[:3]:
         rows.append({
             "Year": fy.year,
-            "Revenue": f"₹{fy.sales_revenue/1e7:.0f}Cr" if fy.sales_revenue else "N/A",
-            "Op. Profit": f"₹{fy.operating_profit/1e7:.0f}Cr" if fy.operating_profit else "N/A",
-            "OPM %": f"{fy.opm:.1f}%" if fy.opm else "N/A",
-            "Net Profit": f"₹{fy.net_profit/1e7:.0f}Cr" if fy.net_profit else "N/A",
-            "PBT": f"₹{fy.profit_before_tax/1e7:.0f}Cr" if fy.profit_before_tax else "N/A",
+            "Revenue": f"₹{fy.sales_revenue/1e7:.2f}Cr" if fy.sales_revenue else "N/A",
+            "Op. Profit": f"₹{fy.operating_profit/1e7:.2f}Cr" if fy.operating_profit else "N/A",
+            "OPM %": f"{fy.opm:.2f}%" if fy.opm else "N/A",
+            "Net Profit": f"₹{fy.net_profit/1e7:.2f}Cr" if fy.net_profit else "N/A",
+            "PBT": f"₹{fy.profit_before_tax/1e7:.2f}Cr" if fy.profit_before_tax else "N/A",
         })
     
     df = pd.DataFrame(rows)
@@ -209,25 +209,25 @@ def display_recommendation(analysis):
         st.metric(
             "Recommendation",
             signal,
-            f"Confidence: {analysis.recommendation.confidence:.0%}",
+            f"Confidence: {analysis.recommendation.confidence:.2%}",
         )
     
     with col2:
         st.metric(
             "Expected Return (Base)",
-            f"{analysis.expected_returns.get('base', 0):.1f}%",
+            f"{analysis.expected_returns.get('base', 0):.2f}%",
         )
     
     with col3:
         st.metric(
             "Bull Case",
-            f"{analysis.expected_returns.get('bull', 0):.1f}%",
+            f"{analysis.expected_returns.get('bull', 0):.2f}%",
         )
     
     with col4:
         st.metric(
             "Bear Case",
-            f"{analysis.expected_returns.get('bear', 0):.1f}%",
+            f"{analysis.expected_returns.get('bear', 0):.2f}%",
         )
     
     st.subheader("Recommendation Rationale")
@@ -266,10 +266,10 @@ def display_trading_outlook(analysis):
             confidence = analysis.swing_trade.confidence_score or 0
             col_conf1, col_conf2 = st.columns(2)
             with col_conf1:
-                st.metric("Confidence Score", f"{confidence:.0f}%", delta=f"+{max(0, confidence - 80):.0f}% above min")
+                st.metric("Confidence Score", f"{confidence:.2f}%", delta=f"+{max(0, confidence - 80):.2f}% above min")
             with col_conf2:
-                st.metric("Target Return", f"{analysis.swing_trade.target_return_percent:.1f}%", 
-                         delta=f"+{max(0, analysis.swing_trade.target_return_percent - 12):.1f}% above min")
+                st.metric("Target Return", f"{analysis.swing_trade.target_return_percent:.2f}%", 
+                         delta=f"+{max(0, analysis.swing_trade.target_return_percent - 12):.2f}% above min")
             
             st.write(f"Entry Zone: {analysis.swing_trade.entry_zone_low:.2f} - {analysis.swing_trade.entry_zone_high:.2f}")
             st.write(f"Target: {analysis.swing_trade.target_low:.2f} - {analysis.swing_trade.target_high:.2f}")
@@ -297,19 +297,19 @@ def display_trading_outlook(analysis):
             col_missing1, col_missing2 = st.columns(2)
             with col_missing1:
                 if confidence < 80:
-                    st.error(f"Confidence too low: {confidence:.0f}% (need ≥80%)")
+                    st.error(f"Confidence too low: {confidence:.2f}% (need ≥80%)")
             with col_missing2:
                 if return_pct < 12:
-                    st.error(f"Return too low: {return_pct:.1f}% (need ≥12%)")
+                    st.error(f"Return too low: {return_pct:.2f}% (need ≥12%)")
             
             st.write(analysis.swing_trade.commentary)
     
     with col2:
         st.write("**Long-Term Outlook (3-Year)**")
         st.write(f"Target Range: {analysis.long_term.target_price_low:.2f} - {analysis.long_term.target_price_high:.2f}")
-        st.write(f"Base Case Return: **{analysis.long_term.base_case_return:.1f}%**")
-        st.write(f"Bull Case: {analysis.long_term.bull_case_return:.1f}%")
-        st.write(f"Bear Case: {analysis.long_term.bear_case_return:.1f}%")
+        st.write(f"Base Case Return: **{analysis.long_term.base_case_return:.2f}%**")
+        st.write(f"Bull Case: {analysis.long_term.bull_case_return:.2f}%")
+        st.write(f"Bear Case: {analysis.long_term.bear_case_return:.2f}%")
         st.caption(analysis.long_term.commentary)
     
     # Price projection chart (1-2 years)
@@ -455,7 +455,7 @@ def display_portfolio_panel():
                                 portfolio_type=PORTFOLIO_TYPE_BY_LABEL[portfolio_label_input],
                                 broker_account=BROKER_ACCOUNT_BY_LABEL[broker_label_input],
                             )
-                            st.success(f"Added {t} × {qty_val:g} @ {price_val:.2f}")
+                            st.success(f"Added {t} × {qty_val:.2f} @ {price_val:.2f}")
                             st.rerun()
                     except ValueError as err:
                         st.error(str(err))
@@ -649,11 +649,11 @@ def display_portfolio_panel():
                     "Company": h.company_name,
                     "Portfolio": PORTFOLIO_TYPE_LABELS.get(h.portfolio_type or "MIDTERM", "Midterm"),
                     "Broker": BROKER_ACCOUNT_LABELS.get(h.broker_account or "ZERODHA", "Zerodha"),
-                    "Qty": int(round(h.remaining_quantity if not sold else h.quantity)),
-                    "Buy": round(h.buying_price, 2),
-                    "Current Price": round(current_or_sell, 2) if current_or_sell is not None else "-",
+                    "Qty": f"{(h.remaining_quantity if not sold else h.quantity):.2f}",
+                    "Buy": f"{h.buying_price:.2f}",
+                    "Current Price": f"{current_or_sell:.2f}" if current_or_sell is not None else "-",
                     "P&L": pl_display,
-                    "P&L %": round(h.realized_pl_pct if sold else h.unrealized_pl_pct, 2),
+                    "P&L %": f"{(h.realized_pl_pct if sold else h.unrealized_pl_pct):.2f}",
                     "Target Status": target_status,
                 }
             )
@@ -706,7 +706,7 @@ def display_portfolio_panel():
                         act_col1, act_col2, act_col3, act_col4 = st.columns([2.8, 1.2, 1.2, 2.8])
                         with act_col1:
                             st.write(
-                                f"**{h.ticker}** ({h.company_name}) | Remaining: {int(round(h.remaining_quantity))}"
+                                f"**{h.ticker}** ({h.company_name}) | Remaining: {h.remaining_quantity:.2f}"
                             )
                         with act_col2:
                             if st.button(
@@ -772,9 +772,9 @@ def display_portfolio_panel():
                     f"<b>{h.ticker}</b> — {h.company_name}<br/>"
                     f"Portfolio: {PORTFOLIO_TYPE_LABELS.get(h.portfolio_type or 'MIDTERM', 'Midterm')}<br/>"
                     f"Broker: {BROKER_ACCOUNT_LABELS.get(h.broker_account or 'ZERODHA', 'Zerodha')}<br/>"
-                    f"Qty: {h.quantity:g} | Buy: {h.buying_price:.2f} | "
+                    f"Qty: {h.quantity:.2f} | Buy: {h.buying_price:.2f} | "
                     f"Now: {f'{h.current_price:.2f}' if h.current_price else '—'} | "
-                    f"Remaining: {h.remaining_quantity:g}<br/>"
+                    f"Remaining: {h.remaining_quantity:.2f}<br/>"
                     f"{pl_emoji} P&L: <b>{pl_val:+,.2f}</b> ({pl_pct:+.2f}%){target_badge}<br/>"
                     f"{target_line}"
                     f"</div>",
@@ -863,9 +863,9 @@ def display_portfolio_panel():
                             "Company": h.company_name,
                             "Portfolio": PORTFOLIO_TYPE_LABELS.get(h.portfolio_type or "MIDTERM", "Midterm"),
                             "Broker": BROKER_ACCOUNT_LABELS.get(h.broker_account or "ZERODHA", "Zerodha"),
-                            "Qty Sold": int(round(h.partial_sold_quantity)),
-                            "Remaining Qty": int(round(h.remaining_quantity)),
-                            "Realized P&L": round(h.partial_realized_pl, 2),
+                            "Qty Sold": f"{h.partial_sold_quantity:.2f}",
+                            "Remaining Qty": f"{h.remaining_quantity:.2f}",
+                            "Realized P&L": f"{h.partial_realized_pl:.2f}",
                         }
                     )
                 st.dataframe(pd.DataFrame(partial_rows), use_container_width=True, height=min(360, 72 + (35 * len(partial_rows))))
@@ -894,7 +894,7 @@ def display_portfolio_panel():
                     f"<b>{h.ticker}</b> — {h.company_name}<br/>"
                     f"Portfolio: {PORTFOLIO_TYPE_LABELS.get(h.portfolio_type or 'MIDTERM', 'Midterm')}<br/>"
                     f"Broker: {BROKER_ACCOUNT_LABELS.get(h.broker_account or 'ZERODHA', 'Zerodha')}<br/>"
-                    f"Qty: {h.quantity:g} | Buy: {h.buying_price:.2f} → Sell: {h.sell_price:.2f}<br/>"
+                    f"Qty: {h.quantity:.2f} | Buy: {h.buying_price:.2f} → Sell: {h.sell_price:.2f}<br/>"
                     f"{pl_emoji} P&L: <b>{pl_val:+,.2f}</b> ({pl_pct:+.2f}%) | Sold: {sell_dt}"
                     f"</div>",
                     unsafe_allow_html=True,
@@ -1081,9 +1081,9 @@ with workspace_tab_research:
             with col1:
                 st.metric("Current Price", f"{analysis.metrics.current_price:.2f} {analysis.metrics.currency}")
             with col2:
-                st.metric("Market Cap", f"${analysis.metrics.market_cap/1e9:.1f}B" if analysis.metrics.market_cap else "N/A")
+                st.metric("Market Cap", f"${analysis.metrics.market_cap/1e9:.2f}B" if analysis.metrics.market_cap else "N/A")
             with col3:
-                st.metric("PE Ratio", f"{analysis.metrics.pe_ratio:.1f}" if analysis.metrics.pe_ratio else "N/A")
+                st.metric("PE Ratio", f"{analysis.metrics.pe_ratio:.2f}" if analysis.metrics.pe_ratio else "N/A")
             with col4:
                 st.metric("52W High", f"{analysis.metrics.week_52_high:.2f}" if analysis.metrics.week_52_high else "N/A")
             with col5:
