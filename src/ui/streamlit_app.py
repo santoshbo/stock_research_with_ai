@@ -2,8 +2,6 @@
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime
-from pathlib import Path
 
 from src.app import StockResearchAgent
 from src.models.research import Recommendation
@@ -205,7 +203,6 @@ def display_recommendation(analysis):
     
     with col1:
         signal = analysis.recommendation.signal.value
-        color = "green" if signal == "BUY" else ("orange" if signal == "HOLD" else "red")
         st.metric(
             "Recommendation",
             signal,
@@ -365,6 +362,8 @@ def display_portfolio_panel():
 
     if "partial_sell_form_open" not in st.session_state:
         st.session_state.partial_sell_form_open = {}
+    if "duplicate_add_context" not in st.session_state:
+        st.session_state.duplicate_add_context = None
 
     def _parse_positive_float(raw: str, field_name: str) -> float:
         val = (raw or "").strip()
@@ -444,21 +443,96 @@ def display_portfolio_panel():
                         else:
                             if not c:
                                 c = t
-                            store.add_holding(
-                                t,
-                                c,
-                                qty_val,
-                                price_val,
-                                currency_input,
-                                target_1_price=target_1_val,
-                                target_2_price=target_2_val,
-                                portfolio_type=PORTFOLIO_TYPE_BY_LABEL[portfolio_label_input],
-                                broker_account=BROKER_ACCOUNT_BY_LABEL[broker_label_input],
+                            portfolio_code = PORTFOLIO_TYPE_BY_LABEL[portfolio_label_input]
+                            broker_code = BROKER_ACCOUNT_BY_LABEL[broker_label_input]
+
+                            existing = store.find_matching_active_holding(
+                                ticker=t,
+                                portfolio_type=portfolio_code,
+                                broker_account=broker_code,
+                                currency=currency_input,
+                                auto_resolve=True,
                             )
-                            st.success(f"Added {t} × {qty_val:.2f} @ {price_val:.2f}")
-                            st.rerun()
+
+                            if existing:
+                                st.session_state.duplicate_add_context = {
+                                    "holding_id": existing.id,
+                                    "ticker": existing.ticker,
+                                    "company_name": existing.company_name,
+                                    "portfolio_label": portfolio_label_input,
+                                    "broker_label": broker_label_input,
+                                    "currency": currency_input,
+                                    "default_qty": qty_val,
+                                    "default_price": price_val,
+                                }
+                                st.warning(
+                                    f"{existing.ticker} is already in portfolio "
+                                    f"({portfolio_label_input} / {broker_label_input} / {currency_input}). "
+                                    "Use the form below to add more quantity."
+                                )
+                            else:
+                                store.add_holding(
+                                    t,
+                                    c,
+                                    qty_val,
+                                    price_val,
+                                    currency_input,
+                                    target_1_price=target_1_val,
+                                    target_2_price=target_2_val,
+                                    portfolio_type=portfolio_code,
+                                    broker_account=broker_code,
+                                )
+                                st.success(f"Added {t} × {qty_val:.2f} @ {price_val:.2f}")
+                                st.rerun()
                     except ValueError as err:
                         st.error(str(err))
+
+    if st.session_state.duplicate_add_context:
+        dup = st.session_state.duplicate_add_context
+        st.info(
+            f"Stock already added: {dup['ticker']} | Portfolio: {dup['portfolio_label']} | "
+            f"Broker: {dup['broker_label']} | Currency: {dup['currency']}"
+        )
+        with st.form("duplicate_add_more_form", clear_on_submit=True):
+            add_more_qty_raw = st.text_input(
+                "Add More Quantity",
+                value=f"{dup['default_qty']:.2f}",
+                placeholder="e.g. 10",
+            )
+            add_more_price_raw = st.text_input(
+                "Buying Price",
+                value=f"{dup['default_price']:.2f}",
+                placeholder="e.g. 1250.50",
+            )
+            c1, c2 = st.columns(2)
+            with c1:
+                confirm_add_more = st.form_submit_button("Yes, Add More", use_container_width=True)
+            with c2:
+                cancel_add_more = st.form_submit_button("Cancel", use_container_width=True)
+
+            if cancel_add_more:
+                st.session_state.duplicate_add_context = None
+                st.rerun()
+
+            if confirm_add_more:
+                try:
+                    add_qty = _parse_positive_float(add_more_qty_raw, "Quantity")
+                    add_price = _parse_positive_float(add_more_price_raw, "Buying price")
+                    ok, new_qty, new_avg = store.add_more_to_holding(
+                        holding_id=int(dup["holding_id"]),
+                        additional_quantity=add_qty,
+                        additional_buying_price=add_price,
+                    )
+                    if ok and new_qty is not None and new_avg is not None:
+                        st.success(
+                            f"Updated {dup['ticker']}: Qty={new_qty:.2f}, Avg Buy={new_avg:.2f}"
+                        )
+                        st.session_state.duplicate_add_context = None
+                        st.rerun()
+                    else:
+                        st.error("Could not update existing holding. Try again.")
+                except ValueError as err:
+                    st.error(str(err))
 
     # ── Load & enrich holdings ──────────────────────────────────────
     all_holdings = store.get_all_holdings()
@@ -483,7 +557,6 @@ def display_portfolio_panel():
         with col_a:
             st.metric("Total Invested", f"{summary.total_invested:,.2f}")
         with col_b:
-            pl_label = "▲ Profit" if summary.total_pl >= 0 else "▼ Loss"
             pl_pct = summary.total_pl_pct
             st.metric(
                 "Overall P&L",

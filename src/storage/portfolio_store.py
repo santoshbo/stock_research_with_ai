@@ -254,6 +254,158 @@ class PortfolioStore:
             target_2_price=target_2_price,
         )
 
+    def find_matching_active_holding(
+        self,
+        ticker: str,
+        portfolio_type: str,
+        broker_account: str,
+        currency: str,
+        auto_resolve: bool = True,
+    ) -> Optional[PortfolioHolding]:
+        """Find existing active holding for same ticker+portfolio+broker+currency."""
+        resolved_ticker = ticker.upper().strip()
+        if auto_resolve:
+            resolved_ticker, _ = self.resolve_ticker(resolved_ticker)
+
+        with self._conn() as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    id,
+                    ticker,
+                    company_name,
+                    quantity,
+                    buying_price,
+                    currency,
+                    portfolio_type,
+                    broker_account,
+                    date_purchased,
+                    target_1_price,
+                    target_2_price,
+                    target_1_achieved,
+                    target_2_achieved,
+                    target_1_achieved_at,
+                    target_2_achieved_at,
+                    partial_sold_quantity,
+                    partial_realized_pl,
+                    is_sold,
+                    sell_price,
+                    sell_date
+                FROM holdings
+                WHERE ticker = ?
+                  AND portfolio_type = ?
+                  AND broker_account = ?
+                  AND currency = ?
+                  AND is_sold = 0
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (resolved_ticker, portfolio_type, broker_account, currency),
+            ).fetchone()
+
+        if not row:
+            return None
+
+        (
+            hid,
+            row_ticker,
+            company_name,
+            quantity,
+            buying_price,
+            row_currency,
+            row_portfolio_type,
+            row_broker_account,
+            date_purchased,
+            target_1_price,
+            target_2_price,
+            target_1_achieved,
+            target_2_achieved,
+            target_1_achieved_at,
+            target_2_achieved_at,
+            partial_sold_quantity,
+            partial_realized_pl,
+            is_sold,
+            sell_price,
+            sell_date,
+        ) = row
+
+        return PortfolioHolding(
+            id=hid,
+            ticker=row_ticker,
+            company_name=company_name,
+            quantity=quantity,
+            buying_price=buying_price,
+            currency=row_currency,
+            portfolio_type=row_portfolio_type,
+            broker_account=row_broker_account,
+            date_purchased=datetime.fromisoformat(date_purchased),
+            target_1_price=target_1_price,
+            target_2_price=target_2_price,
+            target_1_achieved=bool(target_1_achieved),
+            target_2_achieved=bool(target_2_achieved),
+            target_1_achieved_at=datetime.fromisoformat(target_1_achieved_at) if target_1_achieved_at else None,
+            target_2_achieved_at=datetime.fromisoformat(target_2_achieved_at) if target_2_achieved_at else None,
+            partial_sold_quantity=float(partial_sold_quantity or 0),
+            partial_realized_pl=float(partial_realized_pl or 0),
+            is_sold=bool(is_sold),
+            sell_price=sell_price,
+            sell_date=datetime.fromisoformat(sell_date) if sell_date else None,
+        )
+
+    def add_more_to_holding(
+        self,
+        holding_id: int,
+        additional_quantity: float,
+        additional_buying_price: float,
+    ) -> tuple[bool, Optional[float], Optional[float]]:
+        """Increase quantity and recalculate weighted-average buying price.
+
+        Returns: (success, new_quantity, new_buying_price)
+        """
+        if additional_quantity <= 0 or additional_buying_price <= 0:
+            return False, None, None
+
+        with self._conn() as conn:
+            row = conn.execute(
+                """
+                SELECT quantity, buying_price
+                FROM holdings
+                WHERE id = ? AND is_sold = 0
+                """,
+                (holding_id,),
+            ).fetchone()
+
+            if not row:
+                return False, None, None
+
+            current_qty, current_buy_price = float(row[0]), float(row[1])
+            current_invested = current_qty * current_buy_price
+            new_invested = additional_quantity * additional_buying_price
+            updated_qty = current_qty + additional_quantity
+            if updated_qty <= 0:
+                return False, None, None
+
+            updated_avg_buy = (current_invested + new_invested) / updated_qty
+
+            cursor = conn.execute(
+                """
+                UPDATE holdings
+                SET quantity = ?, buying_price = ?
+                WHERE id = ? AND is_sold = 0
+                """,
+                (updated_qty, updated_avg_buy, holding_id),
+            )
+            conn.commit()
+
+        if cursor.rowcount <= 0:
+            return False, None, None
+
+        logger.info(
+            f"Added more to holding id={holding_id}: +qty={additional_quantity:.4f} @ {additional_buying_price:.4f}; "
+            f"new_qty={updated_qty:.4f}, new_avg_buy={updated_avg_buy:.4f}"
+        )
+        return True, updated_qty, updated_avg_buy
+
     def update_holding_targets(
         self,
         holding_id: int,
